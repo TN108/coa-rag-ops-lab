@@ -12,11 +12,14 @@ class Settings:
     QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "pdf_chunks")
 
+    # Embedding settings
     EMBEDDING_MODEL_NAME = os.getenv(
         "EMBEDDING_MODEL_NAME",
         "sentence-transformers/all-MiniLM-L6-v2"
     )
+    EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
 
+    # OCR settings
     ENABLE_OCR = os.getenv("ENABLE_OCR", "false").lower() == "true"
     TESSERACT_CMD = os.getenv(
         "TESSERACT_CMD",
