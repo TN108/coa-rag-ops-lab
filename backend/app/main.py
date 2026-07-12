@@ -1,11 +1,14 @@
 from fastapi import FastAPI
 from app.config import settings
+from app.api.v1 import upload
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="RAG, Chain-of-Agents, hybrid retrieval, evaluation, and LLMOps lab.",
     version=settings.API_VERSION,
 )
+
+app.include_router(upload.router)
 
 
 @app.get("/")
