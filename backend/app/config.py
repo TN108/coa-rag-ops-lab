@@ -24,8 +24,16 @@ class Settings:
     )
     OCR_DPI = int(os.getenv("OCR_DPI", "400"))
 
+    # Fixed-size chunking settings
     CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
     CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
+
+    # Lightweight semantic chunking settings
+    SEMANTIC_CHUNK_MAX_SIZE = int(os.getenv("SEMANTIC_CHUNK_MAX_SIZE", "1200"))
+    SEMANTIC_CHUNK_MIN_SIZE = int(os.getenv("SEMANTIC_CHUNK_MIN_SIZE", "300"))
+    SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS = int(
+        os.getenv("SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS", "1")
+    )
 
 
 settings = Settings()
