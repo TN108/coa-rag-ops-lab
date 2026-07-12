@@ -22,7 +22,10 @@ class Settings:
         "TESSERACT_CMD",
         "C:/Program Files/Tesseract-OCR/tesseract.exe"
     )
-    OCR_DPI = int(os.getenv("OCR_DPI", "200"))
+    OCR_DPI = int(os.getenv("OCR_DPI", "400"))
+
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
+    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
 
 
 settings = Settings()

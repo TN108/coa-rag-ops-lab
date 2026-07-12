@@ -1,6 +1,7 @@
 from fastapi import FastAPI
+
 from app.config import settings
-from app.api.v1 import upload
+from app.api.v1 import upload, rag
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -9,6 +10,7 @@ app = FastAPI(
 )
 
 app.include_router(upload.router)
+app.include_router(rag.router)
 
 
 @app.get("/")
