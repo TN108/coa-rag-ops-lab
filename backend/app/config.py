@@ -17,5 +17,12 @@ class Settings:
         "sentence-transformers/all-MiniLM-L6-v2"
     )
 
+    ENABLE_OCR = os.getenv("ENABLE_OCR", "false").lower() == "true"
+    TESSERACT_CMD = os.getenv(
+        "TESSERACT_CMD",
+        "C:/Program Files/Tesseract-OCR/tesseract.exe"
+    )
+    OCR_DPI = int(os.getenv("OCR_DPI", "200"))
+
 
 settings = Settings()

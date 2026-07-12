@@ -16,11 +16,13 @@ async def upload_pdf(file: UploadFile = File(...)):
         "filename": result["filename"],
         "total_pages": result["total_pages"],
         "total_characters": result["total_characters"],
+        "extraction_method": result["extraction_method"],
         "preview": result["preview"],
         "pages": [
             {
                 "page_number": page["page_number"],
-                "character_count": page["character_count"]
+                "character_count": page["character_count"],
+                "extraction_method": page["extraction_method"]
             }
             for page in result["pages"]
         ]
