@@ -10,6 +10,10 @@ from app.services.embedding_service import (
     generate_embeddings,
     get_embedding_dimension
 )
+from app.services.qdrant_service import (
+    upsert_chunks_to_qdrant,
+    get_collection_info
+)
 
 router = APIRouter(
     prefix="/api/v1/rag",
@@ -156,3 +160,76 @@ async def embed_pdf(
         "total_embeddings": len(embeddings),
         "chunks": embedded_chunks
     }
+
+
+@router.post("/store-pdf")
+async def store_pdf(
+    file: UploadFile = File(...),
+    chunking_method: str = Query(
+        default="semantic",
+        description="Choose 'fixed' or 'semantic'"
+    )
+):
+    extraction_result = await extract_text_from_pdf(file)
+
+    if chunking_method == "fixed":
+        chunks = create_chunks_from_pages(
+            pages=extraction_result["pages"],
+            document_name=extraction_result["filename"],
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP
+        )
+    elif chunking_method == "semantic":
+        chunks = create_semantic_chunks_from_pages(
+            pages=extraction_result["pages"],
+            document_name=extraction_result["filename"],
+            max_chunk_size=settings.SEMANTIC_CHUNK_MAX_SIZE,
+            min_chunk_size=settings.SEMANTIC_CHUNK_MIN_SIZE,
+            overlap_paragraphs=settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
+        )
+    else:
+        return {
+            "error": "Invalid chunking_method. Use 'fixed' or 'semantic'."
+        }
+
+    chunk_texts = [chunk["text"] for chunk in chunks]
+    embeddings = generate_embeddings(chunk_texts)
+
+    storage_result = upsert_chunks_to_qdrant(
+        chunks=chunks,
+        embeddings=embeddings,
+        document_name=extraction_result["filename"],
+        extraction_method=extraction_result["extraction_method"],
+        chunking_method=chunking_method
+    )
+
+    return {
+        "message": "PDF extracted, chunked, embedded, and stored in Qdrant successfully.",
+        "filename": extraction_result["filename"],
+        "extraction_method": extraction_result["extraction_method"],
+        "chunking_method": chunking_method,
+        "embedding_model": settings.EMBEDDING_MODEL_NAME,
+        "embedding_dimension": settings.EMBEDDING_DIMENSION,
+        "total_pages": extraction_result["total_pages"],
+        "total_characters": extraction_result["total_characters"],
+        "total_chunks": len(chunks),
+        "total_embeddings": len(embeddings),
+        "qdrant": storage_result,
+        "stored_chunks": [
+            {
+                "chunk_id": chunk["chunk_id"],
+                "global_chunk_index": chunk["global_chunk_index"],
+                "page_number": chunk["page_number"],
+                "chunk_index": chunk["chunk_index"],
+                "character_count": chunk["character_count"],
+                "chunking_method": chunk["chunking_method"],
+                "text_preview": chunk["text"][:300]
+            }
+            for chunk in chunks
+        ]
+    }
+
+
+@router.get("/collection-info")
+def collection_info():
+    return get_collection_info()

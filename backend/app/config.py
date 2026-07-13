@@ -8,6 +8,7 @@ class Settings:
     APP_NAME = os.getenv("APP_NAME", "COA RAG Ops Lab")
     API_VERSION = os.getenv("API_VERSION", "0.1.0")
 
+    # Qdrant settings
     QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
     QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "pdf_chunks")
@@ -18,6 +19,7 @@ class Settings:
         "sentence-transformers/all-MiniLM-L6-v2"
     )
     EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
+    EMBEDDING_DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "384"))
 
     # OCR settings
     ENABLE_OCR = os.getenv("ENABLE_OCR", "false").lower() == "true"
@@ -25,7 +27,7 @@ class Settings:
         "TESSERACT_CMD",
         "C:/Program Files/Tesseract-OCR/tesseract.exe"
     )
-    OCR_DPI = int(os.getenv("OCR_DPI", "400"))
+    OCR_DPI = int(os.getenv("OCR_DPI", "300"))
 
     # Fixed-size chunking settings
     CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
