@@ -285,23 +285,31 @@ def retrieve_chunks(
 def ask_question(
     question: str = Query(..., description="Question to answer from stored PDF chunks"),
     top_k: int = Query(
-        default=3,
+        default=5,
         ge=1,
         le=10,
-        description="Number of chunks to retrieve for answer generation"
+        description="Number of final chunks to send to the LLM"
     )
 ):
     question_embedding = generate_embedding(question)
 
-    retrieved_chunks = search_similar_chunks(
+    candidate_top_k = max(top_k * 3, 10)
+    min_retrieval_score = 0.10
+    min_chunk_characters = 80
+
+    candidate_chunks = search_similar_chunks(
         query_embedding=question_embedding,
-        top_k=top_k
+        top_k=candidate_top_k
     )
 
     retrieved_chunks = [
-        chunk for chunk in retrieved_chunks
-        if chunk["score"] > 0
+        chunk for chunk in candidate_chunks
+        if chunk["score"] >= min_retrieval_score
+        and chunk["text"]
+        and len(chunk["text"]) >= min_chunk_characters
     ]
+
+    retrieved_chunks = retrieved_chunks[:top_k]
 
     if not retrieved_chunks:
         return {
@@ -310,7 +318,8 @@ def ask_question(
             "answer": "The provided document context does not contain enough information to answer this question.",
             "embedding_model": settings.EMBEDDING_MODEL_NAME,
             "llm_model": settings.OLLAMA_MODEL,
-            "top_k": top_k,
+            "requested_top_k": top_k,
+            "candidate_top_k": candidate_top_k,
             "total_retrieved_chunks": 0,
             "sources": []
         }
@@ -326,8 +335,14 @@ def ask_question(
         "answer": answer,
         "embedding_model": settings.EMBEDDING_MODEL_NAME,
         "llm_model": settings.OLLAMA_MODEL,
-        "top_k": top_k,
+        "requested_top_k": top_k,
+        "candidate_top_k": candidate_top_k,
+        "total_candidate_chunks": len(candidate_chunks),
         "total_retrieved_chunks": len(retrieved_chunks),
+        "filters": {
+            "min_retrieval_score": min_retrieval_score,
+            "min_chunk_characters": min_chunk_characters
+        },
         "sources": [
             {
                 "rank": index + 1,
@@ -337,6 +352,7 @@ def ask_question(
                 "chunk_id": chunk["chunk_id"],
                 "chunk_index": chunk["chunk_index"],
                 "global_chunk_index": chunk["global_chunk_index"],
+                "character_count": chunk["character_count"],
                 "text_preview": chunk["text"][:300] if chunk["text"] else None
             }
             for index, chunk in enumerate(retrieved_chunks)
