@@ -39,6 +39,12 @@ class Settings:
     SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS = int(
         os.getenv("SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS", "1")
     )
+    # LLM settings
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+    RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "3"))
+    
+    
 
 
 settings = Settings()

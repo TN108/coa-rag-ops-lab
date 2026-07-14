@@ -11,12 +11,13 @@ from app.services.embedding_service import (
     generate_embeddings,
     get_embedding_dimension
 )
-
 from app.services.qdrant_service import (
     upsert_chunks_to_qdrant,
     get_collection_info,
     search_similar_chunks
 )
+from app.services.llm_service import generate_rag_answer
+
 
 router = APIRouter(
     prefix="/api/v1/rag",
@@ -237,6 +238,7 @@ async def store_pdf(
 def collection_info():
     return get_collection_info()
 
+
 @router.get("/retrieve")
 def retrieve_chunks(
     question: str = Query(..., description="User question to search relevant chunks"),
@@ -275,5 +277,68 @@ def retrieve_chunks(
                 "text_preview": result["text"][:500] if result["text"] else None
             }
             for index, result in enumerate(results)
+        ]
+    }
+
+
+@router.get("/ask")
+def ask_question(
+    question: str = Query(..., description="Question to answer from stored PDF chunks"),
+    top_k: int = Query(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of chunks to retrieve for answer generation"
+    )
+):
+    question_embedding = generate_embedding(question)
+
+    retrieved_chunks = search_similar_chunks(
+        query_embedding=question_embedding,
+        top_k=top_k
+    )
+
+    retrieved_chunks = [
+        chunk for chunk in retrieved_chunks
+        if chunk["score"] > 0
+    ]
+
+    if not retrieved_chunks:
+        return {
+            "message": "No sufficiently relevant chunks found.",
+            "question": question,
+            "answer": "The provided document context does not contain enough information to answer this question.",
+            "embedding_model": settings.EMBEDDING_MODEL_NAME,
+            "llm_model": settings.OLLAMA_MODEL,
+            "top_k": top_k,
+            "total_retrieved_chunks": 0,
+            "sources": []
+        }
+
+    answer = generate_rag_answer(
+        question=question,
+        retrieved_chunks=retrieved_chunks
+    )
+
+    return {
+        "message": "Answer generated successfully.",
+        "question": question,
+        "answer": answer,
+        "embedding_model": settings.EMBEDDING_MODEL_NAME,
+        "llm_model": settings.OLLAMA_MODEL,
+        "top_k": top_k,
+        "total_retrieved_chunks": len(retrieved_chunks),
+        "sources": [
+            {
+                "rank": index + 1,
+                "score": chunk["score"],
+                "document_name": chunk["document_name"],
+                "page_number": chunk["page_number"],
+                "chunk_id": chunk["chunk_id"],
+                "chunk_index": chunk["chunk_index"],
+                "global_chunk_index": chunk["global_chunk_index"],
+                "text_preview": chunk["text"][:300] if chunk["text"] else None
+            }
+            for index, chunk in enumerate(retrieved_chunks)
         ]
     }
