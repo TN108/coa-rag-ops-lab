@@ -108,6 +108,7 @@ def get_collection_info():
         exact=True
     )
 
+
     return {
         "collection_name": settings.QDRANT_COLLECTION_NAME,
         "vector_size": settings.EMBEDDING_DIMENSION,
@@ -115,3 +116,46 @@ def get_collection_info():
         "total_points": collection_count.count,
         "status": str(collection_info.status)
     }
+def search_similar_chunks(
+    query_embedding: List[float],
+    top_k: int = 5
+):
+    ensure_collection_exists()
+    client = get_qdrant_client()
+
+    # Compatible with older and newer qdrant-client versions
+    try:
+        search_results = client.search(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            query_vector=query_embedding,
+            limit=top_k,
+            with_payload=True
+        )
+    except AttributeError:
+        response = client.query_points(
+            collection_name=settings.QDRANT_COLLECTION_NAME,
+            query=query_embedding,
+            limit=top_k,
+            with_payload=True
+        )
+        search_results = response.points
+
+    results = []
+
+    for result in search_results:
+        payload = result.payload or {}
+
+        results.append({
+            "score": result.score,
+            "chunk_id": payload.get("chunk_id"),
+            "document_name": payload.get("document_name"),
+            "page_number": payload.get("page_number"),
+            "chunk_index": payload.get("chunk_index"),
+            "global_chunk_index": payload.get("global_chunk_index"),
+            "character_count": payload.get("character_count"),
+            "chunking_method": payload.get("chunking_method"),
+            "extraction_method": payload.get("extraction_method"),
+            "text": payload.get("text")
+        })
+
+    return results

@@ -7,12 +7,15 @@ from app.services.chunking_service import (
     create_semantic_chunks_from_pages
 )
 from app.services.embedding_service import (
+    generate_embedding,
     generate_embeddings,
     get_embedding_dimension
 )
+
 from app.services.qdrant_service import (
     upsert_chunks_to_qdrant,
-    get_collection_info
+    get_collection_info,
+    search_similar_chunks
 )
 
 router = APIRouter(
@@ -233,3 +236,44 @@ async def store_pdf(
 @router.get("/collection-info")
 def collection_info():
     return get_collection_info()
+
+@router.get("/retrieve")
+def retrieve_chunks(
+    question: str = Query(..., description="User question to search relevant chunks"),
+    top_k: int = Query(
+        default=5,
+        ge=1,
+        le=10,
+        description="Number of relevant chunks to retrieve"
+    )
+):
+    question_embedding = generate_embedding(question)
+
+    results = search_similar_chunks(
+        query_embedding=question_embedding,
+        top_k=top_k
+    )
+
+    return {
+        "message": "Relevant chunks retrieved successfully.",
+        "question": question,
+        "embedding_model": settings.EMBEDDING_MODEL_NAME,
+        "embedding_dimension": len(question_embedding),
+        "top_k": top_k,
+        "total_results": len(results),
+        "results": [
+            {
+                "rank": index + 1,
+                "score": result["score"],
+                "document_name": result["document_name"],
+                "page_number": result["page_number"],
+                "chunk_id": result["chunk_id"],
+                "chunk_index": result["chunk_index"],
+                "global_chunk_index": result["global_chunk_index"],
+                "chunking_method": result["chunking_method"],
+                "extraction_method": result["extraction_method"],
+                "text_preview": result["text"][:500] if result["text"] else None
+            }
+            for index, result in enumerate(results)
+        ]
+    }
