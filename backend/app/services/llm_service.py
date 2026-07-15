@@ -1,42 +1,85 @@
+import re
+from typing import Any
+
 import requests
 from fastapi import HTTPException
 
 from app.config import settings
 
 
-def build_rag_prompt(question: str, retrieved_chunks: list) -> str:
-    context_parts = []
+FALLBACK_ANSWER = (
+    "The provided document context does not contain enough "
+    "information to answer this question."
+)
 
-    for index, chunk in enumerate(retrieved_chunks, start=1):
+
+def build_rag_prompt(
+    question: str,
+    retrieved_chunks: list[dict[str, Any]],
+) -> str:
+    context_parts: list[str] = []
+
+    for index, chunk in enumerate(
+        retrieved_chunks,
+        start=1,
+    ):
+        text = str(
+            chunk.get("text") or ""
+        ).strip()
+
+        if not text:
+            continue
+
         context_parts.append(
-            f"Source {index}:\n"
-            f"Document: {chunk.get('document_name')}\n"
-            f"Page: {chunk.get('page_number')}\n"
-            f"Chunk ID: {chunk.get('chunk_id')}\n"
-            f"Text:\n{chunk.get('text')}\n"
+            "\n".join(
+                [
+                    f"Source {index}",
+                    (
+                        "Document: "
+                        f"{chunk.get('document_name', 'Unknown')}"
+                    ),
+                    (
+                        "Page: "
+                        f"{chunk.get('page_number', 'Unknown')}"
+                    ),
+                    (
+                        "Chunk ID: "
+                        f"{chunk.get('chunk_id', 'Unknown')}"
+                    ),
+                    "Text:",
+                    text,
+                ]
+            )
         )
 
-    context = "\n\n".join(context_parts)
+    context = "\n\n---\n\n".join(
+        context_parts
+    )
 
     return f"""
-You are a strict document-grounded RAG assistant.
+You are a document-grounded question-answering assistant.
 
-Answer the question using only the provided context.
-Do not use outside knowledge.
-Do not infer facts that are not explicitly stated in the context.
-Do not guess.
-Do not add explanations that are not supported by the context.
-Answer directly and briefly.
+Use only the retrieved context below.
 
-Do not say "according to Source 1", "according to Source 2", or similar source-number phrases.
-The API already returns sources separately.
+Instructions:
+1. Read all retrieved sources before answering.
+2. Combine information from multiple sources when necessary.
+3. Answer the question directly and concisely.
+4. Do not use outside knowledge.
+5. Do not invent facts or unsupported details.
+6. Do not refuse only because the answer is not written in one exact sentence.
+7. If the context supports a useful partial answer, provide only the supported information.
+8. If the context does not support the answer, respond with the exact fallback sentence below and nothing else.
+9. Never mention source numbers such as "Source 1", "Source 2", or "according to Source".
+10. Do not mention document names, page numbers, or chunk IDs.
+11. Do not begin a non-yes-or-no answer with "Yes" or "No".
+12. Keep the answer between one and four sentences.
+13. For yes-or-no questions, begin with "Yes" or "No" only when the context clearly supports that conclusion.
 
-If the context only partially answers the question, state only what the context says and mention that no further detail is provided.
+Exact fallback sentence:
+"{FALLBACK_ANSWER}"
 
-If the answer is not present in the context, say exactly:
-"The provided document context does not contain enough information to answer this question."
-
-Context:
+Retrieved context:
 {context}
 
 Question:
@@ -46,10 +89,15 @@ Answer:
 """.strip()
 
 
-def generate_answer_with_ollama(prompt: str) -> str:
+def generate_answer_with_ollama(
+    prompt: str,
+) -> str:
     try:
         response = requests.post(
-            f"{settings.OLLAMA_BASE_URL}/api/generate",
+            (
+                f"{settings.OLLAMA_BASE_URL}"
+                "/api/generate"
+            ),
             json={
                 "model": settings.OLLAMA_MODEL,
                 "prompt": prompt,
@@ -57,39 +105,150 @@ def generate_answer_with_ollama(prompt: str) -> str:
                 "options": {
                     "temperature": 0,
                     "top_p": 0.8,
-                    "repeat_penalty": 1.1
-                }
+                    "repeat_penalty": 1.1,
+                    "num_predict": 256,
+                },
             },
-            timeout=120
+            timeout=180,
         )
+
+    except requests.exceptions.Timeout as error:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Ollama request timed out: "
+                f"{error}"
+            ),
+        ) from error
+
+    except requests.exceptions.ConnectionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Could not connect to Ollama. "
+                "Confirm that Ollama is running and "
+                "OLLAMA_BASE_URL is correct."
+            ),
+        ) from error
+
     except requests.exceptions.RequestException as error:
         raise HTTPException(
             status_code=500,
-            detail=f"Could not connect to Ollama: {str(error)}"
-        )
+            detail=(
+                "Ollama request failed: "
+                f"{error}"
+            ),
+        ) from error
 
     if response.status_code != 200:
         raise HTTPException(
             status_code=500,
-            detail=f"Ollama error: {response.text}"
+            detail=(
+                f"Ollama returned status "
+                f"{response.status_code}: "
+                f"{response.text}"
+            ),
         )
 
-    data = response.json()
-    return data.get("response", "").strip()
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Ollama returned an invalid JSON response."
+            ),
+        ) from error
+
+    return str(
+        data.get("response") or ""
+    ).strip()
 
 
-def generate_rag_answer(question: str, retrieved_chunks: list) -> str:
-    if not retrieved_chunks:
-        return "No relevant document chunks were retrieved."
+def clean_generated_answer(
+    answer: str,
+) -> str:
+    cleaned = answer.strip()
 
-    prompt = build_rag_prompt(
-        question=question,
-        retrieved_chunks=retrieved_chunks
+    if not cleaned:
+        return ""
+
+    cleaned = re.sub(
+        r"(?i)^according to source \d+[,:]?\s*",
+        "",
+        cleaned,
     )
 
-    answer = generate_answer_with_ollama(prompt)
+    cleaned = re.sub(
+        r"(?i)\baccording to source \d+[,:]?\s*",
+        "",
+        cleaned,
+    )
+
+    cleaned = re.sub(
+        (
+            r"(?i)\bsource \d+\s+"
+            r"(states|says|explains|indicates) that\s*"
+        ),
+        "",
+        cleaned,
+    )
+
+    cleaned = re.sub(
+        r"(?i)^yes\.\s+(?!(?:it|the context|langgraph)\b)",
+        "",
+        cleaned,
+    )
+
+    cleaned = re.sub(
+        r"\s+",
+        " ",
+        cleaned,
+    )
+
+    return cleaned.strip()
+
+
+def generate_rag_answer(
+    question: str,
+    retrieved_chunks: list[dict[str, Any]],
+) -> str:
+    cleaned_question = question.strip()
+
+    if not cleaned_question:
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty.",
+        )
+
+    valid_chunks = [
+        chunk
+        for chunk in retrieved_chunks
+        if str(
+            chunk.get("text") or ""
+        ).strip()
+    ]
+
+    if not valid_chunks:
+        return FALLBACK_ANSWER
+
+    prompt = build_rag_prompt(
+        question=cleaned_question,
+        retrieved_chunks=valid_chunks,
+    )
+
+    answer = generate_answer_with_ollama(
+        prompt
+    )
 
     if not answer:
-        return "The model did not generate an answer."
+        return FALLBACK_ANSWER
 
-    return answer
+    cleaned_answer = clean_generated_answer(
+        answer
+    )
+
+    if not cleaned_answer:
+        return FALLBACK_ANSWER
+
+    return cleaned_answer
