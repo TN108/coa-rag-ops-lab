@@ -46,6 +46,24 @@ class EvaluationService:
 
         return dataset
 
+    @staticmethod
+    def average_values(
+        values: list[float],
+    ) -> float:
+        """
+        Return the average of a list of numbers.
+
+        Returns 0.0 when the list is empty.
+        """
+
+        if not values:
+            return 0.0
+
+        return round(
+            sum(values) / len(values),
+            2,
+        )
+
     def evaluate_question(
         self,
         record: dict[str, Any],
@@ -69,6 +87,11 @@ class EvaluationService:
             retrieved_sources = rag_result.get(
                 "sources",
                 [],
+            )
+
+            latency = rag_result.get(
+                "latency",
+                {},
             )
 
             metrics = calculate_question_metrics(
@@ -115,6 +138,38 @@ class EvaluationService:
                     "answerable"
                 ],
                 "metrics": metrics,
+                "latency": {
+                    "embedding_ms": float(
+                        latency.get(
+                            "embedding_ms",
+                            0.0,
+                        )
+                    ),
+                    "retrieval_ms": float(
+                        latency.get(
+                            "retrieval_ms",
+                            0.0,
+                        )
+                    ),
+                    "filtering_ms": float(
+                        latency.get(
+                            "filtering_ms",
+                            0.0,
+                        )
+                    ),
+                    "generation_ms": float(
+                        latency.get(
+                            "generation_ms",
+                            0.0,
+                        )
+                    ),
+                    "total_ms": float(
+                        latency.get(
+                            "total_ms",
+                            0.0,
+                        )
+                    ),
+                },
                 "success": True,
                 "error": None,
             }
@@ -147,9 +202,111 @@ class EvaluationService:
                     False,
                 ),
                 "metrics": {},
+                "latency": {
+                    "embedding_ms": 0.0,
+                    "retrieval_ms": 0.0,
+                    "filtering_ms": 0.0,
+                    "generation_ms": 0.0,
+                    "total_ms": 0.0,
+                },
                 "success": False,
                 "error": str(exc),
             }
+
+    def calculate_latency_summary(
+        self,
+        successful_results: list[
+            dict[str, Any]
+        ],
+    ) -> dict[str, float]:
+        """
+        Calculate average latency for every RAG stage.
+        """
+
+        embedding_latencies = []
+        retrieval_latencies = []
+        filtering_latencies = []
+        generation_latencies = []
+        total_latencies = []
+
+        for result in successful_results:
+            latency = result.get(
+                "latency",
+                {},
+            )
+
+            embedding_latencies.append(
+                float(
+                    latency.get(
+                        "embedding_ms",
+                        0.0,
+                    )
+                )
+            )
+
+            retrieval_latencies.append(
+                float(
+                    latency.get(
+                        "retrieval_ms",
+                        0.0,
+                    )
+                )
+            )
+
+            filtering_latencies.append(
+                float(
+                    latency.get(
+                        "filtering_ms",
+                        0.0,
+                    )
+                )
+            )
+
+            generation_latencies.append(
+                float(
+                    latency.get(
+                        "generation_ms",
+                        0.0,
+                    )
+                )
+            )
+
+            total_latencies.append(
+                float(
+                    latency.get(
+                        "total_ms",
+                        0.0,
+                    )
+                )
+            )
+
+        return {
+            "average_embedding_ms": (
+                self.average_values(
+                    embedding_latencies
+                )
+            ),
+            "average_retrieval_ms": (
+                self.average_values(
+                    retrieval_latencies
+                )
+            ),
+            "average_filtering_ms": (
+                self.average_values(
+                    filtering_latencies
+                )
+            ),
+            "average_generation_ms": (
+                self.average_values(
+                    generation_latencies
+                )
+            ),
+            "average_total_ms": (
+                self.average_values(
+                    total_latencies
+                )
+            ),
+        }
 
     def run_evaluation(
         self,
@@ -194,16 +351,18 @@ class EvaluationService:
                 return 0.0
 
             values = [
-                result["metrics"].get(
-                    metric_name,
-                    0.0,
+                float(
+                    result["metrics"].get(
+                        metric_name,
+                        0.0,
+                    )
                 )
                 for result in successful_results
             ]
 
-            return (
-                sum(values)
-                / len(values)
+            return round(
+                sum(values) / len(values),
+                4,
             )
 
         answerable_results = [
@@ -228,17 +387,25 @@ class EvaluationService:
                 return 0.0
 
             values = [
-                result["metrics"].get(
-                    metric_name,
-                    0.0,
+                float(
+                    result["metrics"].get(
+                        metric_name,
+                        0.0,
+                    )
                 )
                 for result in selected_results
             ]
 
-            return (
-                sum(values)
-                / len(values)
+            return round(
+                sum(values) / len(values),
+                4,
             )
+
+        latency_summary = (
+            self.calculate_latency_summary(
+                successful_results
+            )
+        )
 
         summary = {
             "retrieval_hit_rate": (
@@ -292,6 +459,7 @@ class EvaluationService:
                     "unanswerable_correct",
                 )
             ),
+            "latency": latency_summary,
         }
 
         return {
