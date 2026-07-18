@@ -157,10 +157,25 @@ class EvaluationService:
                             0.0,
                         )
                     ),
-                    "generation_ms": float(
+                    "reranking_ms": float(
                         latency.get(
-                            "generation_ms",
+                            "reranking_ms",
                             0.0,
+                        )
+                    ),
+                    "neighbor_retrieval_ms": float(
+                        latency.get(
+                            "neighbor_retrieval_ms",
+                            0.0,
+                        )
+                    ),
+                    "llm_generation_ms": float(
+                        latency.get(
+                            "llm_generation_ms",
+                            latency.get(
+                                "generation_ms",
+                                0.0,
+                            ),
                         )
                     ),
                     "total_ms": float(
@@ -206,7 +221,9 @@ class EvaluationService:
                     "embedding_ms": 0.0,
                     "retrieval_ms": 0.0,
                     "filtering_ms": 0.0,
-                    "generation_ms": 0.0,
+                    "reranking_ms": 0.0,
+                    "neighbor_retrieval_ms": 0.0,
+                    "llm_generation_ms": 0.0,
                     "total_ms": 0.0,
                 },
                 "success": False,
@@ -223,90 +240,53 @@ class EvaluationService:
         Calculate average latency for every RAG stage.
         """
 
-        embedding_latencies = []
-        retrieval_latencies = []
-        filtering_latencies = []
-        generation_latencies = []
-        total_latencies = []
-
-        for result in successful_results:
-            latency = result.get(
-                "latency",
-                {},
-            )
-
-            embedding_latencies.append(
-                float(
-                    latency.get(
-                        "embedding_ms",
-                        0.0,
-                    )
-                )
-            )
-
-            retrieval_latencies.append(
-                float(
-                    latency.get(
-                        "retrieval_ms",
-                        0.0,
-                    )
-                )
-            )
-
-            filtering_latencies.append(
-                float(
-                    latency.get(
-                        "filtering_ms",
-                        0.0,
-                    )
-                )
-            )
-
-            generation_latencies.append(
-                float(
-                    latency.get(
-                        "generation_ms",
-                        0.0,
-                    )
-                )
-            )
-
-            total_latencies.append(
-                float(
-                    latency.get(
-                        "total_ms",
-                        0.0,
-                    )
-                )
-            )
-
-        return {
+        latency_keys = {
             "average_embedding_ms": (
-                self.average_values(
-                    embedding_latencies
-                )
+                "embedding_ms"
             ),
             "average_retrieval_ms": (
-                self.average_values(
-                    retrieval_latencies
-                )
+                "retrieval_ms"
             ),
             "average_filtering_ms": (
-                self.average_values(
-                    filtering_latencies
-                )
+                "filtering_ms"
             ),
-            "average_generation_ms": (
-                self.average_values(
-                    generation_latencies
-                )
+            "average_reranking_ms": (
+                "reranking_ms"
+            ),
+            "average_neighbor_retrieval_ms": (
+                "neighbor_retrieval_ms"
+            ),
+            "average_llm_generation_ms": (
+                "llm_generation_ms"
             ),
             "average_total_ms": (
-                self.average_values(
-                    total_latencies
-                )
+                "total_ms"
             ),
         }
+
+        summary: dict[str, float] = {}
+
+        for summary_key, latency_key in (
+            latency_keys.items()
+        ):
+            values = [
+                float(
+                    result.get(
+                        "latency",
+                        {},
+                    ).get(
+                        latency_key,
+                        0.0,
+                    )
+                )
+                for result in successful_results
+            ]
+
+            summary[summary_key] = (
+                self.average_values(values)
+            )
+
+        return summary
 
     def run_evaluation(
         self,

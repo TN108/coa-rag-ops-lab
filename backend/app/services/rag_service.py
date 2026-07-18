@@ -1,4 +1,5 @@
-from typing import Any
+from time import perf_counter
+from typing import Any, Callable
 
 from fastapi import (
     APIRouter,
@@ -24,6 +25,7 @@ from app.services.llm_service import generate_rag_answer
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.qdrant_service import (
     get_collection_info,
+    get_neighboring_chunks,
     search_similar_chunks,
     upsert_chunks_to_qdrant,
 )
@@ -34,6 +36,46 @@ router = APIRouter(
     prefix="/api/v1/rag",
     tags=["RAG"],
 )
+
+
+def validate_chunking_method(chunking_method: str) -> str:
+    method = chunking_method.strip().lower()
+
+    if method not in {"fixed", "semantic"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid chunking_method. "
+                "Use 'fixed' or 'semantic'."
+            ),
+        )
+
+    return method
+
+
+def build_chunks(
+    extraction_result: dict[str, Any],
+    chunking_method: str,
+) -> list[dict[str, Any]]:
+    method = validate_chunking_method(chunking_method)
+
+    if method == "fixed":
+        return create_chunks_from_pages(
+            pages=extraction_result["pages"],
+            document_name=extraction_result["filename"],
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP,
+        )
+
+    return create_semantic_chunks_from_pages(
+        pages=extraction_result["pages"],
+        document_name=extraction_result["filename"],
+        max_chunk_size=settings.SEMANTIC_CHUNK_MAX_SIZE,
+        min_chunk_size=settings.SEMANTIC_CHUNK_MIN_SIZE,
+        overlap_paragraphs=(
+            settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
+        ),
+    )
 
 
 class EvaluationRunRequest(BaseModel):
@@ -50,20 +92,23 @@ class EvaluationRunRequest(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    chunking_method: str = Field(
+        default="semantic",
+        description="Choose 'fixed' or 'semantic'.",
+    )
 
 
 @router.post("/chunk-pdf")
 async def chunk_pdf(
     file: UploadFile = File(...),
+    chunking_method: str = Query(
+        default="fixed",
+        description="Choose 'fixed' or 'semantic'.",
+    ),
 ) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
     extraction_result = await extract_text_from_pdf(file)
-
-    chunks = create_chunks_from_pages(
-        pages=extraction_result["pages"],
-        document_name=extraction_result["filename"],
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
-    )
+    chunks = build_chunks(extraction_result, method)
 
     return {
         "message": "PDF extracted and chunked successfully.",
@@ -71,13 +116,12 @@ async def chunk_pdf(
         "extraction_method": extraction_result[
             "extraction_method"
         ],
-        "chunking_method": "fixed_character_overlap",
+        "chunking_method": method,
+        "collection_name": settings.get_collection_name(method),
         "total_pages": extraction_result["total_pages"],
         "total_characters": extraction_result[
             "total_characters"
         ],
-        "chunk_size": settings.CHUNK_SIZE,
-        "chunk_overlap": settings.CHUNK_OVERLAP,
         "total_chunks": len(chunks),
         "chunks": [
             {
@@ -90,12 +134,10 @@ async def chunk_pdf(
                 "character_count": chunk[
                     "character_count"
                 ],
-                "start_char": chunk["start_char"],
-                "end_char": chunk["end_char"],
                 "chunking_method": chunk[
                     "chunking_method"
                 ],
-                "preview": chunk["text"][:300],
+                "preview": chunk["text"][:500],
             }
             for chunk in chunks
         ],
@@ -107,15 +149,9 @@ async def semantic_chunk_pdf(
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
     extraction_result = await extract_text_from_pdf(file)
-
-    chunks = create_semantic_chunks_from_pages(
-        pages=extraction_result["pages"],
-        document_name=extraction_result["filename"],
-        max_chunk_size=settings.SEMANTIC_CHUNK_MAX_SIZE,
-        min_chunk_size=settings.SEMANTIC_CHUNK_MIN_SIZE,
-        overlap_paragraphs=(
-            settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
-        ),
+    chunks = build_chunks(
+        extraction_result=extraction_result,
+        chunking_method="semantic",
     )
 
     return {
@@ -127,20 +163,14 @@ async def semantic_chunk_pdf(
         "extraction_method": extraction_result[
             "extraction_method"
         ],
-        "chunking_method": "paragraph_section_semantic",
+        "chunking_method": "semantic",
+        "collection_name": settings.get_collection_name(
+            "semantic"
+        ),
         "total_pages": extraction_result["total_pages"],
         "total_characters": extraction_result[
             "total_characters"
         ],
-        "semantic_chunk_max_size": (
-            settings.SEMANTIC_CHUNK_MAX_SIZE
-        ),
-        "semantic_chunk_min_size": (
-            settings.SEMANTIC_CHUNK_MIN_SIZE
-        ),
-        "semantic_chunk_overlap_paragraphs": (
-            settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
-        ),
         "total_chunks": len(chunks),
         "chunks": [
             {
@@ -153,7 +183,7 @@ async def semantic_chunk_pdf(
                 "character_count": chunk[
                     "character_count"
                 ],
-                "block_count": chunk["block_count"],
+                "block_count": chunk.get("block_count"),
                 "chunking_method": chunk[
                     "chunking_method"
                 ],
@@ -169,42 +199,12 @@ async def embed_pdf(
     file: UploadFile = File(...),
     chunking_method: str = Query(
         default="semantic",
-        description="Choose 'fixed' or 'semantic'",
+        description="Choose 'fixed' or 'semantic'.",
     ),
 ) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
     extraction_result = await extract_text_from_pdf(file)
-
-    if chunking_method == "fixed":
-        chunks = create_chunks_from_pages(
-            pages=extraction_result["pages"],
-            document_name=extraction_result["filename"],
-            chunk_size=settings.CHUNK_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
-        )
-
-    elif chunking_method == "semantic":
-        chunks = create_semantic_chunks_from_pages(
-            pages=extraction_result["pages"],
-            document_name=extraction_result["filename"],
-            max_chunk_size=(
-                settings.SEMANTIC_CHUNK_MAX_SIZE
-            ),
-            min_chunk_size=(
-                settings.SEMANTIC_CHUNK_MIN_SIZE
-            ),
-            overlap_paragraphs=(
-                settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
-            ),
-        )
-
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Invalid chunking_method. "
-                "Use 'fixed' or 'semantic'."
-            ),
-        )
+    chunks = build_chunks(extraction_result, method)
 
     chunk_texts = [chunk["text"] for chunk in chunks]
     embeddings = generate_embeddings(chunk_texts)
@@ -242,7 +242,8 @@ async def embed_pdf(
         "extraction_method": extraction_result[
             "extraction_method"
         ],
-        "chunking_method": chunking_method,
+        "chunking_method": method,
+        "collection_name": settings.get_collection_name(method),
         "embedding_model": settings.EMBEDDING_MODEL_NAME,
         "embedding_dimension": embedding_dimension,
         "total_pages": extraction_result["total_pages"],
@@ -260,42 +261,12 @@ async def store_pdf(
     file: UploadFile = File(...),
     chunking_method: str = Query(
         default="semantic",
-        description="Choose 'fixed' or 'semantic'",
+        description="Choose 'fixed' or 'semantic'.",
     ),
 ) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
     extraction_result = await extract_text_from_pdf(file)
-
-    if chunking_method == "fixed":
-        chunks = create_chunks_from_pages(
-            pages=extraction_result["pages"],
-            document_name=extraction_result["filename"],
-            chunk_size=settings.CHUNK_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
-        )
-
-    elif chunking_method == "semantic":
-        chunks = create_semantic_chunks_from_pages(
-            pages=extraction_result["pages"],
-            document_name=extraction_result["filename"],
-            max_chunk_size=(
-                settings.SEMANTIC_CHUNK_MAX_SIZE
-            ),
-            min_chunk_size=(
-                settings.SEMANTIC_CHUNK_MIN_SIZE
-            ),
-            overlap_paragraphs=(
-                settings.SEMANTIC_CHUNK_OVERLAP_PARAGRAPHS
-            ),
-        )
-
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Invalid chunking_method. "
-                "Use 'fixed' or 'semantic'."
-            ),
-        )
+    chunks = build_chunks(extraction_result, method)
 
     chunk_texts = [chunk["text"] for chunk in chunks]
     embeddings = generate_embeddings(chunk_texts)
@@ -307,7 +278,7 @@ async def store_pdf(
         extraction_method=extraction_result[
             "extraction_method"
         ],
-        chunking_method=chunking_method,
+        chunking_method=method,
     )
 
     return {
@@ -319,7 +290,8 @@ async def store_pdf(
         "extraction_method": extraction_result[
             "extraction_method"
         ],
-        "chunking_method": chunking_method,
+        "chunking_method": method,
+        "collection_name": settings.get_collection_name(method),
         "embedding_model": settings.EMBEDDING_MODEL_NAME,
         "embedding_dimension": settings.EMBEDDING_DIMENSION,
         "total_pages": extraction_result["total_pages"],
@@ -351,8 +323,17 @@ async def store_pdf(
 
 
 @router.get("/collection-info")
-def collection_info() -> dict[str, Any]:
-    return get_collection_info()
+def collection_info(
+    chunking_method: str = Query(
+        default="semantic",
+        description="Choose 'fixed' or 'semantic'.",
+    ),
+) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
+
+    return get_collection_info(
+        chunking_method=method,
+    )
 
 
 @router.get("/retrieve")
@@ -371,17 +352,25 @@ def retrieve_chunks(
             "Number of relevant chunks to retrieve"
         ),
     ),
+    chunking_method: str = Query(
+        default="semantic",
+        description="Choose 'fixed' or 'semantic'.",
+    ),
 ) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
     question_embedding = generate_embedding(question)
 
     results = search_similar_chunks(
         query_embedding=question_embedding,
         top_k=top_k,
+        chunking_method=method,
     )
 
     return {
         "message": "Relevant chunks retrieved successfully.",
         "question": question,
+        "chunking_method": method,
+        "collection_name": settings.get_collection_name(method),
         "embedding_model": settings.EMBEDDING_MODEL_NAME,
         "embedding_dimension": len(question_embedding),
         "top_k": top_k,
@@ -420,31 +409,38 @@ def run_rag_question(
     question: str,
     top_k: int = 5,
     min_retrieval_score: float = 0.10,
+    chunking_method: str = "semantic",
 ) -> dict[str, Any]:
-    """
-    Run the reusable RAG question-answering pipeline.
+    method = chunking_method.strip().lower()
 
-    Processing sequence:
+    if method not in {"fixed", "semantic"}:
+        raise ValueError(
+            "chunking_method must be either "
+            "'fixed' or 'semantic'."
+        )
 
-    1. Generate an embedding for the question.
-    2. Retrieve a larger candidate set from Qdrant.
-    3. Filter weak or very short chunks.
-    4. Rerank the remaining chunks with a CrossEncoder.
-    5. Pass the final top-k chunks to the LLM.
+    total_start = perf_counter()
 
-    This function is used by both the normal /ask endpoint
-    and the automatic evaluation endpoint.
-    """
-
+    embedding_start = perf_counter()
     question_embedding = generate_embedding(question)
+    embedding_ms = (
+        perf_counter() - embedding_start
+    ) * 1000
 
     candidate_top_k = max(top_k * 3, 10)
     min_chunk_characters = 80
 
+    retrieval_start = perf_counter()
     candidate_chunks = search_similar_chunks(
         query_embedding=question_embedding,
         top_k=candidate_top_k,
+        chunking_method=method,
     )
+    retrieval_ms = (
+        perf_counter() - retrieval_start
+    ) * 1000
+
+    filtering_start = perf_counter()
 
     filtered_chunks = [
         chunk
@@ -454,79 +450,188 @@ def run_rag_question(
         and len(chunk["text"]) >= min_chunk_characters
     ]
 
-    retrieved_chunks = rerank_chunks(
+    filtering_ms = (
+        perf_counter() - filtering_start
+    ) * 1000
+
+    reranking_start = perf_counter()
+    reranked_chunks = rerank_chunks(
         question=question,
         chunks=filtered_chunks,
         top_k=top_k,
     )
+    reranking_ms = (
+        perf_counter() - reranking_start
+    ) * 1000
 
-    if not retrieved_chunks:
-        return {
-            "message": (
-                "No sufficiently relevant chunks found."
-            ),
-            "question": question,
-            "answer": (
-                "The provided document context does not "
-                "contain enough information to answer "
-                "this question."
-            ),
-            "embedding_model": (
-                settings.EMBEDDING_MODEL_NAME
-            ),
-            "llm_model": settings.OLLAMA_MODEL,
-            "requested_top_k": top_k,
-            "candidate_top_k": candidate_top_k,
-            "total_candidate_chunks": len(
-                candidate_chunks
-            ),
-            "total_filtered_chunks": len(
-                filtered_chunks
-            ),
-            "total_retrieved_chunks": 0,
-            "reranking_enabled": True,
-            "reranker_model": (
-                "cross-encoder/ms-marco-MiniLM-L-6-v2"
-            ),
-            "filters": {
-                "min_retrieval_score": (
-                    min_retrieval_score
-                ),
-                "min_chunk_characters": (
-                    min_chunk_characters
-                ),
-            },
-            "sources": [],
-        }
-
-    answer = generate_rag_answer(
-        question=question,
-        retrieved_chunks=retrieved_chunks,
-    )
-
-    return {
-        "message": "Answer generated successfully.",
+    base_response = {
         "question": question,
-        "answer": answer,
+        "chunking_method": method,
+        "collection_name": settings.get_collection_name(method),
         "embedding_model": settings.EMBEDDING_MODEL_NAME,
         "llm_model": settings.OLLAMA_MODEL,
         "requested_top_k": top_k,
         "candidate_top_k": candidate_top_k,
-        "total_candidate_chunks": len(candidate_chunks),
-        "total_filtered_chunks": len(filtered_chunks),
-        "total_retrieved_chunks": len(
-            retrieved_chunks
+        "total_candidate_chunks": len(
+            candidate_chunks
+        ),
+        "total_filtered_chunks": len(
+            filtered_chunks
         ),
         "reranking_enabled": True,
         "reranker_model": (
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
+        "neighbor_page_retrieval": True,
+        "page_window": 1,
         "filters": {
             "min_retrieval_score": (
                 min_retrieval_score
             ),
             "min_chunk_characters": (
                 min_chunk_characters
+            ),
+        },
+    }
+
+    if not reranked_chunks:
+        total_ms = (
+            perf_counter() - total_start
+        ) * 1000
+
+        return {
+            **base_response,
+            "message": (
+                "No sufficiently relevant chunks found."
+            ),
+            "answer": (
+                "The provided document context does not "
+                "contain enough information to answer "
+                "this question."
+            ),
+            "total_reranked_chunks": 0,
+            "total_neighbor_chunks": 0,
+            "total_retrieved_chunks": 0,
+            "latency": {
+                "embedding_ms": round(
+                    embedding_ms,
+                    2,
+                ),
+                "retrieval_ms": round(
+                    retrieval_ms,
+                    2,
+                ),
+                "filtering_ms": round(
+                    filtering_ms,
+                    2,
+                ),
+                "reranking_ms": round(
+                    reranking_ms,
+                    2,
+                ),
+                "neighbor_retrieval_ms": 0.0,
+                "llm_generation_ms": 0.0,
+                "total_ms": round(
+                    total_ms,
+                    2,
+                ),
+            },
+            "sources": [],
+        }
+
+    page_window = 1
+
+    neighbor_retrieval_start = perf_counter()
+
+    neighbor_chunks = get_neighboring_chunks(
+        seed_chunks=reranked_chunks,
+        page_window=page_window,
+        chunking_method=method,
+    )
+
+    neighbor_chunks = [
+        chunk
+        for chunk in neighbor_chunks
+        if chunk.get("text")
+        and len(chunk["text"].strip())
+        >= min_chunk_characters
+    ]
+
+    neighbor_retrieval_ms = (
+        perf_counter() - neighbor_retrieval_start
+    ) * 1000
+
+    retrieved_chunks: list[dict[str, Any]] = []
+    seen_chunk_ids: set[str] = set()
+
+    for chunk in reranked_chunks + neighbor_chunks:
+        chunk_id = chunk.get("chunk_id")
+
+        if not chunk_id:
+            continue
+
+        if chunk_id in seen_chunk_ids:
+            continue
+
+        seen_chunk_ids.add(chunk_id)
+        retrieved_chunks.append(chunk)
+
+    llm_generation_start = perf_counter()
+
+    answer = generate_rag_answer(
+        question=question,
+        retrieved_chunks=retrieved_chunks,
+    )
+
+    llm_generation_ms = (
+        perf_counter() - llm_generation_start
+    ) * 1000
+
+    total_ms = (
+        perf_counter() - total_start
+    ) * 1000
+
+    return {
+        **base_response,
+        "message": "Answer generated successfully.",
+        "answer": answer,
+        "total_reranked_chunks": len(
+            reranked_chunks
+        ),
+        "total_neighbor_chunks": len(
+            neighbor_chunks
+        ),
+        "total_retrieved_chunks": len(
+            retrieved_chunks
+        ),
+        "latency": {
+            "embedding_ms": round(
+                embedding_ms,
+                2,
+            ),
+            "retrieval_ms": round(
+                retrieval_ms,
+                2,
+            ),
+            "filtering_ms": round(
+                filtering_ms,
+                2,
+            ),
+            "reranking_ms": round(
+                reranking_ms,
+                2,
+            ),
+            "neighbor_retrieval_ms": round(
+                neighbor_retrieval_ms,
+                2,
+            ),
+            "llm_generation_ms": round(
+                llm_generation_ms,
+                2,
+            ),
+            "total_ms": round(
+                total_ms,
+                2,
             ),
         },
         "sources": [
@@ -543,12 +648,22 @@ def run_rag_question(
                 "reranker_score": chunk.get(
                     "reranker_score"
                 ),
+                "is_neighbor": chunk.get(
+                    "is_neighbor",
+                    False,
+                ),
                 "document_name": chunk[
                     "document_name"
                 ],
-                "page_number": chunk["page_number"],
-                "chunk_id": chunk["chunk_id"],
-                "chunk_index": chunk["chunk_index"],
+                "page_number": chunk[
+                    "page_number"
+                ],
+                "chunk_id": chunk[
+                    "chunk_id"
+                ],
+                "chunk_index": chunk[
+                    "chunk_index"
+                ],
                 "global_chunk_index": chunk[
                     "global_chunk_index"
                 ],
@@ -593,11 +708,18 @@ def ask_question(
             "Minimum similarity score for retrieved chunks"
         ),
     ),
+    chunking_method: str = Query(
+        default="semantic",
+        description="Choose 'fixed' or 'semantic'.",
+    ),
 ) -> dict[str, Any]:
+    method = validate_chunking_method(chunking_method)
+
     return run_rag_question(
         question=question,
         top_k=top_k,
         min_retrieval_score=min_retrieval_score,
+        chunking_method=method,
     )
 
 
@@ -606,17 +728,47 @@ def run_evaluation(
     request: EvaluationRunRequest,
 ) -> dict[str, Any]:
     try:
-        evaluation_service = EvaluationService(
-            rag_answer_function=run_rag_question,
+        method = request.chunking_method.strip().lower()
+
+        if method not in {"fixed", "semantic"}:
+            raise ValueError(
+                "chunking_method must be either "
+                "'fixed' or 'semantic'."
+            )
+
+        rag_answer_function: Callable[
+            ..., dict[str, Any]
+        ] = (
+            lambda question,
+            top_k=5,
+            min_retrieval_score=0.10: run_rag_question(
+                question=question,
+                top_k=top_k,
+                min_retrieval_score=(
+                    min_retrieval_score
+                ),
+                chunking_method=method,
+            )
         )
 
-        return evaluation_service.run_evaluation(
+        evaluation_service = EvaluationService(
+            rag_answer_function=rag_answer_function,
+        )
+
+        result = evaluation_service.run_evaluation(
             dataset_path=request.dataset_path,
             top_k=request.top_k,
             min_retrieval_score=(
                 request.min_retrieval_score
             ),
         )
+
+        result["chunking_method"] = method
+        result["collection_name"] = (
+            settings.get_collection_name(method)
+        )
+
+        return result
 
     except FileNotFoundError as exc:
         raise HTTPException(
