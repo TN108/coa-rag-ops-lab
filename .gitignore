@@ -30,3 +30,12 @@ data/processed/*
 
 # Logs
 *.log
+
+
+
+# Generated experiment results
+backend/data/experiments/*
+!backend/data/experiments/.gitkeep
+
+# Generated LinkedIn image
+94aa3e21-6026-4374-b91b-245ae16e56f4.png
