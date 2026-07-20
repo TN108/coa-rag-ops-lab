@@ -2,6 +2,9 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from app.services.experiment_service import (
+    experiment_service,
+)
 from app.services.metrics_service import (
     calculate_question_metrics,
 )
@@ -294,6 +297,18 @@ class EvaluationService:
         top_k: int,
         min_retrieval_score: float,
     ) -> dict[str, Any]:
+        experiment_id = (
+            experiment_service.generate_experiment_id()
+        )
+
+        experiment_configuration = {
+            "dataset_path": dataset_path,
+            "top_k": top_k,
+            "min_retrieval_score": (
+                min_retrieval_score
+            ),
+        }
+
         dataset = self.load_dataset(
             dataset_path
         )
@@ -442,9 +457,13 @@ class EvaluationService:
             "latency": latency_summary,
         }
 
-        return {
+        evaluation_result = {
             "message": (
                 "Evaluation completed."
+            ),
+            "experiment_id": experiment_id,
+            "experiment_configuration": (
+                experiment_configuration
             ),
             "total_questions": len(
                 results
@@ -468,3 +487,20 @@ class EvaluationService:
             "summary": summary,
             "results": results,
         }
+
+        saved_path = (
+            experiment_service.save_experiment(
+                experiment_id=experiment_id,
+                configuration=(
+                    experiment_configuration
+                ),
+                results=evaluation_result,
+                experiment_type="single_run",
+            )
+        )
+
+        evaluation_result[
+            "saved_result_path"
+        ] = str(saved_path)
+
+        return evaluation_result
