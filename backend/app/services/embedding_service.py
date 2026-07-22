@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import List
 
 from sentence_transformers import SentenceTransformer
@@ -5,19 +6,23 @@ from sentence_transformers import SentenceTransformer
 from app.config import settings
 
 
-_model = None
-
-
+@lru_cache(maxsize=1)
 def get_embedding_model():
-    global _model
+    """
+    Load embedding model only once.
+    """
 
-    if _model is None:
-        _model = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+    print("LOADING EMBEDDING MODEL")
 
-    return _model
+    return SentenceTransformer(
+        settings.EMBEDDING_MODEL_NAME
+    )
 
 
-def generate_embedding(text: str) -> List[float]:
+def generate_embedding(
+    text: str,
+) -> List[float]:
+
     if not text or not text.strip():
         return []
 
@@ -25,17 +30,26 @@ def generate_embedding(text: str) -> List[float]:
 
     embedding = model.encode(
         text,
-        normalize_embeddings=True
+        normalize_embeddings=True,
+        show_progress_bar=False,
     )
 
     return embedding.tolist()
 
 
-def generate_embeddings(texts: List[str]) -> List[List[float]]:
+
+def generate_embeddings(
+    texts: List[str],
+) -> List[List[float]]:
+
     if not texts:
         return []
 
-    cleaned_texts = [text for text in texts if text and text.strip()]
+    cleaned_texts = [
+        text.strip()
+        for text in texts
+        if text and text.strip()
+    ]
 
     if not cleaned_texts:
         return []
@@ -46,12 +60,19 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
         cleaned_texts,
         batch_size=settings.EMBEDDING_BATCH_SIZE,
         normalize_embeddings=True,
-        show_progress_bar=False
+        show_progress_bar=False,
     )
 
     return embeddings.tolist()
 
 
+
 def get_embedding_dimension() -> int:
+    """
+    Return embedding vector size.
+    Used when creating Qdrant collections.
+    """
+
     model = get_embedding_model()
+
     return model.get_sentence_embedding_dimension()

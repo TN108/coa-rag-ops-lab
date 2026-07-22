@@ -137,6 +137,16 @@ class Settings:
         "OLLAMA_MODEL",
         "llama3.2:3b",
     )
+    
+    PLANNER_MODEL = os.getenv(
+        "PLANNER_MODEL",
+        "llama3.2:1b",
+    )
+     # Reranker settings
+    RERANKER_MODEL_NAME = os.getenv(
+        "RERANKER_MODEL_NAME",
+        "cross-encoder/ms-marco-TinyBERT-L-2-v2",
+    )
 
     # Evaluation settings
     RETRIEVAL_TOP_K = int(

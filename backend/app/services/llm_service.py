@@ -93,24 +93,32 @@ def generate_answer_with_ollama(
     prompt: str,
 ) -> str:
     try:
-        response = requests.post(
-            (
-                f"{settings.OLLAMA_BASE_URL}"
-                "/api/generate"
-            ),
-            json={
-                "model": settings.OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0,
-                    "top_p": 0.8,
-                    "repeat_penalty": 1.1,
-                    "num_predict": 256,
-                },
-            },
-            timeout=180,
-        )
+      response = requests.post(
+    (
+        f"{settings.OLLAMA_BASE_URL}"
+        "/api/generate"
+    ),
+    json={
+        "model": settings.OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+
+        # Keep model loaded in memory
+        "keep_alive": "10m",
+
+        "options": {
+            "temperature": 0,
+
+            "top_p": 0.8,
+
+            "repeat_penalty": 1.1,
+
+            # RAG answers are short
+            "num_predict": 80,
+        },
+    },
+    timeout=180,
+)
 
     except requests.exceptions.Timeout as error:
         raise HTTPException(

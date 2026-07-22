@@ -30,6 +30,7 @@ from app.services.qdrant_service import (
     upsert_chunks_to_qdrant,
 )
 from app.services.reranker_service import rerank_chunks
+from app.services.planner_service import planner_service
 
 
 router = APIRouter(
@@ -79,22 +80,34 @@ def build_chunks(
 
 
 class EvaluationRunRequest(BaseModel):
+
     dataset_path: str = Field(
         default="data/evaluation/evaluation_dataset.json"
     )
+
     top_k: int = Field(
         default=5,
         ge=1,
         le=10,
     )
+
     min_retrieval_score: float = Field(
         default=0.10,
         ge=0.0,
         le=1.0,
     )
+
     chunking_method: str = Field(
         default="semantic",
         description="Choose 'fixed' or 'semantic'.",
+    )
+
+    adaptive: bool = Field(
+        default=True,
+        description=(
+            "True runs Adaptive RAG evaluation. "
+            "False runs baseline RAG evaluation."
+        ),
     )
 
 
@@ -410,6 +423,7 @@ def run_rag_question(
     top_k: int = 5,
     min_retrieval_score: float = 0.10,
     chunking_method: str = "semantic",
+    page_window: int = 1,
 ) -> dict[str, Any]:
     method = chunking_method.strip().lower()
 
@@ -483,7 +497,7 @@ def run_rag_question(
             "cross-encoder/ms-marco-MiniLM-L-6-v2"
         ),
         "neighbor_page_retrieval": True,
-        "page_window": 1,
+        "page_window": page_window,
         "filters": {
             "min_retrieval_score": (
                 min_retrieval_score
@@ -539,7 +553,7 @@ def run_rag_question(
             "sources": [],
         }
 
-    page_window = 1
+    
 
     neighbor_retrieval_start = perf_counter()
 
@@ -727,63 +741,219 @@ def ask_question(
 def run_evaluation(
     request: EvaluationRunRequest,
 ) -> dict[str, Any]:
-    try:
-        method = request.chunking_method.strip().lower()
 
-        if method not in {"fixed", "semantic"}:
+    try:
+
+        method = (
+            request.chunking_method
+            .strip()
+            .lower()
+        )
+
+
+        if method not in {
+            "fixed",
+            "semantic",
+        }:
             raise ValueError(
                 "chunking_method must be either "
                 "'fixed' or 'semantic'."
             )
+
 
         rag_answer_function: Callable[
             ..., dict[str, Any]
         ] = (
             lambda question,
             top_k=5,
-            min_retrieval_score=0.10: run_rag_question(
+            min_retrieval_score=0.10,
+            chunking_method="semantic",
+            page_window=1:
+
+            run_rag_question(
                 question=question,
                 top_k=top_k,
                 min_retrieval_score=(
                     min_retrieval_score
                 ),
-                chunking_method=method,
+                chunking_method=(
+                    chunking_method
+                ),
+                page_window=(
+                    page_window
+                ),
             )
         )
 
+
         evaluation_service = EvaluationService(
-            rag_answer_function=rag_answer_function,
+            rag_answer_function=(
+                rag_answer_function
+            )
         )
 
-        result = evaluation_service.run_evaluation(
-            dataset_path=request.dataset_path,
-            top_k=request.top_k,
-            min_retrieval_score=(
-                request.min_retrieval_score
-            ),
-        )
+
+        if request.adaptive:
+
+            result = (
+                evaluation_service
+                .run_adaptive_evaluation(
+                    dataset_path=(
+                        request.dataset_path
+                    )
+                )
+            )
+
+        else:
+
+            result = (
+                evaluation_service
+                .run_evaluation(
+                    dataset_path=(
+                        request.dataset_path
+                    ),
+                    top_k=request.top_k,
+                    min_retrieval_score=(
+                        request.min_retrieval_score
+                    ),
+                )
+            )
+
 
         result["chunking_method"] = method
+
         result["collection_name"] = (
-            settings.get_collection_name(method)
+            settings.get_collection_name(
+                method
+            )
         )
+
 
         return result
 
+
     except FileNotFoundError as exc:
+
         raise HTTPException(
             status_code=404,
             detail=str(exc),
         ) from exc
 
+
     except ValueError as exc:
+
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         ) from exc
 
+
     except Exception as exc:
+
         raise HTTPException(
             status_code=500,
-            detail=f"Evaluation failed: {exc}",
+            detail=(
+                f"Evaluation failed: {exc}"
+            ),
         ) from exc
+@router.post("/adaptive-ask")
+def adaptive_ask_question(
+    question: str = Query(
+        ...,
+        description=(
+            "Question answered using Adaptive RAG planner"
+        ),
+    ),
+) -> dict[str, Any]:
+
+    total_start = perf_counter()
+
+    planner_result = planner_service.plan(
+        question
+    )
+
+    decision = planner_result[
+        "planner_decision"
+    ]
+
+    result = run_rag_question(
+        question=question,
+        top_k=decision["top_k"],
+        min_retrieval_score=(
+            decision["min_retrieval_score"]
+        ),
+        chunking_method=(
+            decision["chunking_method"]
+        ),
+        page_window=(
+            decision["neighbor_window"]
+        ),
+    )
+
+
+    total_ms = (
+        perf_counter()
+        -
+        total_start
+    ) * 1000
+
+
+    return {
+        "question": question,
+
+        "planner_model": planner_result[
+            "planner_model"
+        ],
+
+        "planner_decision": decision,
+
+        "planner_fallback_used": planner_result[
+            "fallback_used"
+        ],
+
+        "answer": result["answer"],
+
+        "sources": result["sources"],
+
+        "latency": {
+            "planner_ms": planner_result[
+                "planner_ms"
+            ],
+
+            "embedding_ms": result[
+                "latency"
+            ]["embedding_ms"],
+
+            "retrieval_ms": result[
+                "latency"
+            ]["retrieval_ms"],
+
+            "reranking_ms": result[
+                "latency"
+            ]["reranking_ms"],
+
+            "generation_ms": result[
+                "latency"
+            ]["llm_generation_ms"],
+
+            "total_ms": round(
+                total_ms,
+                2,
+            ),
+        },
+
+        "rag_metadata": {
+            "chunking_method": decision[
+                "chunking_method"
+            ],
+            "top_k": decision[
+                "top_k"
+            ],
+            "min_retrieval_score": decision[
+                "min_retrieval_score"
+            ],
+            "neighbor_window": decision[
+                "neighbor_window"
+            ],
+        },
+    }
