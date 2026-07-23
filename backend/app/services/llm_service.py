@@ -1,262 +1,121 @@
+# backend/app/services/llm_service.py
 import re
-from typing import Any
-
+import json
 import requests
+from functools import lru_cache
 from fastapi import HTTPException
-
 from app.config import settings
-
 
 FALLBACK_ANSWER = (
     "The provided document context does not contain enough "
     "information to answer this question."
 )
 
-
-def build_rag_prompt(
-    question: str,
-    retrieved_chunks: list[dict[str, Any]],
-) -> str:
-    context_parts: list[str] = []
-
-    for index, chunk in enumerate(
-        retrieved_chunks,
-        start=1,
-    ):
-        text = str(
-            chunk.get("text") or ""
-        ).strip()
-
-        if not text:
-            continue
-
-        context_parts.append(
-            "\n".join(
-                [
-                    f"Source {index}",
-                    (
-                        "Document: "
-                        f"{chunk.get('document_name', 'Unknown')}"
-                    ),
-                    (
-                        "Page: "
-                        f"{chunk.get('page_number', 'Unknown')}"
-                    ),
-                    (
-                        "Chunk ID: "
-                        f"{chunk.get('chunk_id', 'Unknown')}"
-                    ),
-                    "Text:",
-                    text,
-                ]
-            )
-        )
-
-    context = "\n\n---\n\n".join(
-        context_parts
+# Cached LLM client for COA
+@lru_cache(maxsize=1)
+def get_llm():
+    """
+    Returns a cached Llama 3.2:3b client (Ollama API wrapper).
+    """
+    return Llama3Client(
+        base_url=settings.OLLAMA_BASE_URL,
+        model=settings.OLLAMA_MODEL
     )
 
-    return f"""
-You are a document-grounded question-answering assistant.
+class Llama3Client:
+    def __init__(self, base_url: str, model: str):
+        self.base_url = base_url
+        self.model = model
 
-Use only the retrieved context below.
+    def generate(self, prompt: str) -> str:
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "keep_alive": "10m",
+                    "options": {
+                        "temperature": 0,
+                        "top_p": 0.8,
+                        "repeat_penalty": 1.1,
+                        "num_predict": 80,
+                    },
+                },
+                timeout=180,
+            )
+        except requests.exceptions.Timeout as error:
+            raise HTTPException(status_code=504, detail=f"Ollama request timed out: {error}")
+        except requests.exceptions.ConnectionError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Could not connect to Ollama. Confirm that Ollama is running and OLLAMA_BASE_URL is correct."
+            )
+        except requests.exceptions.RequestException as error:
+            raise HTTPException(status_code=500, detail=f"Ollama request failed: {error}")
 
-Instructions:
-1. Read all retrieved sources before answering.
-2. Combine information from multiple sources when necessary.
-3. Answer the question directly and concisely.
-4. Do not use outside knowledge.
-5. Do not invent facts or unsupported details.
-6. Do not refuse only because the answer is not written in one exact sentence.
-7. If the context supports a useful partial answer, provide only the supported information.
-8. If the context does not support the answer, respond with the exact fallback sentence below and nothing else.
-9. Never mention source numbers such as "Source 1", "Source 2", or "according to Source".
-10. Do not mention document names, page numbers, or chunk IDs.
-11. Do not begin a non-yes-or-no answer with "Yes" or "No".
-12. Keep the answer between one and four sentences.
-13. For yes-or-no questions, begin with "Yes" or "No" only when the context clearly supports that conclusion.
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Ollama returned status {response.status_code}: {response.text}")
 
-Exact fallback sentence:
-"{FALLBACK_ANSWER}"
+        try:
+            data = response.json()
+        except ValueError as error:
+            raise HTTPException(status_code=500, detail="Ollama returned an invalid JSON response.") from error
 
-Retrieved context:
-{context}
-
-Question:
-{question}
-
-Answer:
-""".strip()
-
-
-def generate_answer_with_ollama(
-    prompt: str,
-) -> str:
-    try:
-      response = requests.post(
-    (
-        f"{settings.OLLAMA_BASE_URL}"
-        "/api/generate"
-    ),
-    json={
-        "model": settings.OLLAMA_MODEL,
-        "prompt": prompt,
-        "stream": False,
-
-        # Keep model loaded in memory
-        "keep_alive": "10m",
-
-        "options": {
-            "temperature": 0,
-
-            "top_p": 0.8,
-
-            "repeat_penalty": 1.1,
-
-            # RAG answers are short
-            "num_predict": 80,
-        },
-    },
-    timeout=180,
-)
-
-    except requests.exceptions.Timeout as error:
-        raise HTTPException(
-            status_code=504,
-            detail=(
-                "Ollama request timed out: "
-                f"{error}"
-            ),
-        ) from error
-
-    except requests.exceptions.ConnectionError as error:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Could not connect to Ollama. "
-                "Confirm that Ollama is running and "
-                "OLLAMA_BASE_URL is correct."
-            ),
-        ) from error
-
-    except requests.exceptions.RequestException as error:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Ollama request failed: "
-                f"{error}"
-            ),
-        ) from error
-
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Ollama returned status "
-                f"{response.status_code}: "
-                f"{response.text}"
-            ),
-        )
-
-    try:
-        data = response.json()
-    except ValueError as error:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Ollama returned an invalid JSON response."
-            ),
-        ) from error
-
-    return str(
-        data.get("response") or ""
-    ).strip()
+        return str(data.get("response") or "").strip()
 
 
-def clean_generated_answer(
-    answer: str,
-) -> str:
+def clean_generated_answer(answer: str) -> str:
     cleaned = answer.strip()
-
     if not cleaned:
         return ""
-
-    cleaned = re.sub(
-        r"(?i)^according to source \d+[,:]?\s*",
-        "",
-        cleaned,
-    )
-
-    cleaned = re.sub(
-        r"(?i)\baccording to source \d+[,:]?\s*",
-        "",
-        cleaned,
-    )
-
-    cleaned = re.sub(
-        (
-            r"(?i)\bsource \d+\s+"
-            r"(states|says|explains|indicates) that\s*"
-        ),
-        "",
-        cleaned,
-    )
-
-    cleaned = re.sub(
-        r"(?i)^yes\.\s+(?!(?:it|the context|langgraph)\b)",
-        "",
-        cleaned,
-    )
-
-    cleaned = re.sub(
-        r"\s+",
-        " ",
-        cleaned,
-    )
-
+    cleaned = re.sub(r"(?i)^according to source \d+[,:]?\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)\baccording to source \d+[,:]?\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)\bsource \d+\s+(states|says|explains|indicates) that\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)^yes\.\s+(?!(?:it|the context|langgraph)\b)", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
 
 
-def generate_rag_answer(
-    question: str,
-    retrieved_chunks: list[dict[str, Any]],
-) -> str:
+def generate_rag_answer(question: str, retrieved_chunks: list[dict]) -> str:
     cleaned_question = question.strip()
-
     if not cleaned_question:
-        raise HTTPException(
-            status_code=400,
-            detail="Question cannot be empty.",
-        )
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    valid_chunks = [
-        chunk
-        for chunk in retrieved_chunks
-        if str(
-            chunk.get("text") or ""
-        ).strip()
-    ]
-
+    valid_chunks = [c for c in retrieved_chunks if str(c.get("text") or "").strip()]
     if not valid_chunks:
         return FALLBACK_ANSWER
 
-    prompt = build_rag_prompt(
-        question=cleaned_question,
-        retrieved_chunks=valid_chunks,
-    )
+    # Build prompt for LLM
+    context_parts = []
+    for idx, chunk in enumerate(valid_chunks, 1):
+        text = str(chunk.get("text") or "").strip()
+        if text:
+            context_parts.append(
+                "\n".join([
+                    f"Document: {chunk.get('document_name','Unknown')}",
+                    f"Page: {chunk.get('page_number','Unknown')}",
+                    f"Chunk ID: {chunk.get('chunk_id','Unknown')}",
+                    "Text:",
+                    text
+                ])
+            )
+    context = "\n\n---\n\n".join(context_parts)
+    prompt = f"""
+You are a document-grounded question-answering assistant.
+Use only the retrieved context below.
+Return a JSON array of facts with each claim and source chunk IDs.
+Fallback answer if context is insufficient:
+"{FALLBACK_ANSWER}"
+Context:
+{context}
+Question:
+{cleaned_question}
+""".strip()
 
-    answer = generate_answer_with_ollama(
-        prompt
-    )
+    llm = get_llm()
+    answer = llm.generate(prompt)
+    cleaned_answer = clean_generated_answer(answer)
 
-    if not answer:
-        return FALLBACK_ANSWER
-
-    cleaned_answer = clean_generated_answer(
-        answer
-    )
-
-    if not cleaned_answer:
-        return FALLBACK_ANSWER
-
-    return cleaned_answer
+    return cleaned_answer or FALLBACK_ANSWER
