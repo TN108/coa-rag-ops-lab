@@ -7,6 +7,33 @@ from app.agents.state import COAState
 from app.services.llm_service import generate_coa_facts
 
 
+def get_reasoning_chunk_limit(
+    question: str,
+) -> int:
+    """
+    Select the number of retrieved chunks available to reasoning.
+
+    Simple definition and authorship questions use three chunks.
+    More complex questions use five chunks.
+    """
+
+    normalized_question = question.strip().lower()
+
+    simple_definition_prefixes = (
+        "what is a ",
+        "what is an ",
+        "what is langgraph",
+        "who authored",
+    )
+
+    if normalized_question.startswith(
+        simple_definition_prefixes
+    ):
+        return 3
+
+    return 5
+
+
 def reasoning_agent(
     state: COAState,
 ) -> COAState:
@@ -15,10 +42,11 @@ def reasoning_agent(
 
     The reasoning agent:
     1. Reads the question and retrieved chunks.
-    2. Calls the structured COA fact generator.
-    3. Stores validated claims in structured_facts.
-    4. Stores a JSON representation in reasoning for debugging.
-    5. Records reasoning latency.
+    2. Selects an appropriate reasoning context limit.
+    3. Calls the structured COA fact generator.
+    4. Stores validated claims in structured_facts.
+    5. Stores a JSON representation in reasoning for debugging.
+    6. Records reasoning latency.
     """
 
     print("Running Reasoning Agent")
@@ -55,12 +83,22 @@ def reasoning_agent(
         state["latency"]["reasoning_ms"] = 0.0
         return state
 
+    reasoning_chunk_limit = (
+        get_reasoning_chunk_limit(question)
+    )
+
+    print(
+        "Reasoning chunk limit:",
+        reasoning_chunk_limit,
+    )
+
     start = time.perf_counter()
 
     try:
         reasoning_output = generate_coa_facts(
             question=question,
             retrieved_chunks=chunks,
+            max_chunks=reasoning_chunk_limit,
         )
 
     except Exception as error:
@@ -95,7 +133,7 @@ def reasoning_agent(
     # Machine-readable facts consumed by the critic.
     state["structured_facts"] = structured_facts
 
-    # Valid JSON string retained only for logs and API debugging.
+    # Valid JSON string retained for logs and API debugging.
     state["reasoning"] = json.dumps(
         {
             "claims": structured_facts,
