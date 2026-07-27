@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from app.config import settings
-from app.api.v1 import upload, rag
-from app.api.v1.coa_router import router as coa_router  # <-- new import
+from app.api.v1 import upload
+from app.api.v1.rag_router import router as rag_router
+from app.api.v1.coa_router import router as coa_router
+from app.api.v1.coa_eval_router import router as coa_eval_router
+from app.api.v1.rag_eval_router import router as rag_eval_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -10,8 +13,9 @@ app = FastAPI(
 )
 
 app.include_router(upload.router)
-app.include_router(rag.router)
-app.include_router(coa_router, prefix="/api/v1")  # <-- include COA router
+app.include_router(rag_router, prefix="/api/v1")
+app.include_router(coa_router, prefix="/api/v1")
+app.include_router(coa_eval_router, prefix="/api/v1")
 
 @app.get("/")
 def root():
@@ -27,3 +31,4 @@ def health_check():
         "app_name": settings.APP_NAME,
         "version": settings.API_VERSION,
     }
+app.include_router(rag_eval_router, prefix="/api/v1")
