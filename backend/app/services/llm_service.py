@@ -1448,13 +1448,44 @@ def extract_explicit_cli_command_fact(
 # Early answerability gate
 # ============================================================
 
+# These thresholds are intentionally separated because reranker
+# logits and embedding retrieval scores use different scales.
+#
+# CrossEncoder reranker scores are raw logits. A score around 0.0
+# is treated as usable evidence, while 4.0 is treated as strong
+# evidence. Retrieval scores are cosine-like similarities in this
+# pipeline, so they use their own thresholds.
+REASONING_GATE_MIN_RERANKER_SCORE = 0.0
+REASONING_GATE_STRONG_RERANKER_SCORE = 4.0
+REASONING_GATE_MIN_RETRIEVAL_SCORE = 0.35
+REASONING_GATE_STRONG_RETRIEVAL_SCORE = 0.50
+REASONING_GATE_MIN_FOCUS_COVERAGE = 0.50
+REASONING_GATE_DEBUG = True
+
+
+def safe_optional_float(
+    value: object,
+) -> float | None:
+    """Convert a score to float without turning missing data into 0."""
+
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def extract_question_focus_terms(
     question: str,
 ) -> set[str]:
     """
-    Extract specific topic terms that should appear in evidence.
+    Extract question-specific content terms.
 
-    General question words and relationship words are ignored.
+    Function words, broad relationship words, and generic instruction
+    words are removed. The remaining terms are used only as one gate
+    signal; exact keyword overlap is no longer the sole requirement.
     """
 
     ignored_words = {
@@ -1497,7 +1528,15 @@ def extract_question_focus_terms(
         "as",
         "into",
         "inside",
+        "between",
+        "through",
+        "across",
+        "during",
+        "before",
+        "after",
         "another",
+        "each",
+        "every",
         "run",
         "required",
         "require",
@@ -1527,8 +1566,10 @@ def extract_question_focus_terms(
         "internally",
         "command",
         "commands",
-        "do",
-        "does",
+        "main",
+        "important",
+        "role",
+        "way",
     }
 
     return {
@@ -1536,98 +1577,519 @@ def extract_question_focus_terms(
         for token in normalise_text(
             clean_question_prefix(question)
         ).split()
-        if token not in ignored_words
+        if (
+            token not in ignored_words
+            and len(token) >= 2
+        )
     }
 
 
-def evidence_contains_focus_terms(
+def get_token_variants(
+    token: str,
+) -> set[str]:
+    """
+    Return conservative morphological variants for one token.
+
+    This handles small wording changes such as:
+    - checkpoint/checkpoints
+    - store/stored/storing
+    - node/nodes
+
+    It does not attempt broad semantic synonym expansion.
+    """
+
+    cleaned = normalise_text(token)
+
+    if not cleaned:
+        return set()
+
+    variants = {cleaned}
+
+    if len(cleaned) > 4 and cleaned.endswith("ies"):
+        variants.add(
+            f"{cleaned[:-3]}y"
+        )
+
+    if len(cleaned) > 4 and cleaned.endswith("ing"):
+        stem = cleaned[:-3]
+        variants.add(stem)
+
+        if stem:
+            variants.add(
+                f"{stem}e"
+            )
+
+    if len(cleaned) > 3 and cleaned.endswith("ed"):
+        stem = cleaned[:-2]
+        variants.add(stem)
+
+        if stem:
+            variants.add(
+                f"{stem}e"
+            )
+
+    if len(cleaned) > 4 and cleaned.endswith("es"):
+        variants.add(
+            cleaned[:-2]
+        )
+
+    if len(cleaned) > 3 and cleaned.endswith("s"):
+        variants.add(
+            cleaned[:-1]
+        )
+
+    return {
+        variant
+        for variant in variants
+        if len(variant) >= 2
+    }
+
+
+def get_focus_term_match_details(
     question: str,
     retrieved_chunks: list[dict],
-) -> bool:
+) -> dict:
     """
-    Return True only when all extracted focus terms occur somewhere
-    in the selected evidence.
+    Measure focus-term overlap between a question and selected evidence.
+
+    The result is diagnostic and includes:
+    - extracted focus terms;
+    - matched and missing terms;
+    - total coverage.
+
+    Matching supports conservative morphological variants instead of
+    requiring every original token to occur exactly.
     """
 
     focus_terms = extract_question_focus_terms(
         question
     )
 
-    if not focus_terms:
+    evidence_tokens = set(
+        normalise_text(
+            " ".join(
+                str(chunk.get("text") or "")
+                for chunk in retrieved_chunks
+            )
+        ).split()
+    )
+
+    matched_terms: set[str] = set()
+
+    for term in focus_terms:
+        variants = get_token_variants(term)
+
+        if variants.intersection(evidence_tokens):
+            matched_terms.add(term)
+
+    missing_terms = focus_terms - matched_terms
+
+    coverage = (
+        len(matched_terms) / len(focus_terms)
+        if focus_terms
+        else 1.0
+    )
+
+    return {
+        "focus_terms": sorted(focus_terms),
+        "matched_terms": sorted(matched_terms),
+        "missing_terms": sorted(missing_terms),
+        "matched_count": len(matched_terms),
+        "focus_term_count": len(focus_terms),
+        "coverage": round(coverage, 4),
+    }
+
+
+def evidence_contains_focus_terms(
+    question: str,
+    retrieved_chunks: list[dict],
+    minimum_coverage: float = (
+        REASONING_GATE_MIN_FOCUS_COVERAGE
+    ),
+) -> bool:
+    """
+    Return True when enough question-specific terms occur in evidence.
+
+    The old implementation required every focus term to appear
+    exactly. That rejected valid paraphrases. The corrected version
+    treats term overlap as one signal and accepts partial but
+    meaningful overlap.
+    """
+
+    details = get_focus_term_match_details(
+        question=question,
+        retrieved_chunks=retrieved_chunks,
+    )
+
+    if details["focus_term_count"] == 0:
         return True
 
-    evidence_text = normalise_text(
-        " ".join(
-            str(chunk.get("text") or "")
-            for chunk in retrieved_chunks
-        )
+    return (
+        details["matched_count"] >= 1
+        and details["coverage"] >= minimum_coverage
     )
 
-    return all(
-        term in evidence_text
-        for term in focus_terms
-    )
+
+def get_reasoning_score_details(
+    retrieved_chunks: list[dict],
+) -> dict:
+    """
+    Return reranker and retrieval signals without mixing their scales.
+
+    A chunk may contain both scores. Missing reranker values do not
+    suppress valid retrieval scores.
+    """
+
+    chunk_scores: list[dict] = []
+    reranker_scores: list[float] = []
+    retrieval_scores: list[float] = []
+
+    for chunk in retrieved_chunks:
+        reranker_score = safe_optional_float(
+            chunk.get("reranker_score")
+        )
+
+        retrieval_score = safe_optional_float(
+            chunk.get(
+                "retrieval_score",
+                chunk.get("score"),
+            )
+        )
+
+        if reranker_score is not None:
+            reranker_scores.append(
+                reranker_score
+            )
+
+        if retrieval_score is not None:
+            retrieval_scores.append(
+                retrieval_score
+            )
+
+        chunk_scores.append(
+            {
+                "chunk_id": str(
+                    chunk.get("chunk_id") or ""
+                ),
+                "reranker_score": reranker_score,
+                "retrieval_score": retrieval_score,
+            }
+        )
+
+    return {
+        "best_reranker_score": (
+            max(reranker_scores)
+            if reranker_scores
+            else None
+        ),
+        "best_retrieval_score": (
+            max(retrieval_scores)
+            if retrieval_scores
+            else None
+        ),
+        "chunk_scores": chunk_scores,
+    }
 
 
 def get_best_reasoning_score(
     retrieved_chunks: list[dict],
 ) -> float:
     """
-    Return the strongest available reranker or retrieval score.
+    Return the best available score for backward compatibility.
+
+    Reranker score is preferred when present. Otherwise the best
+    retrieval score is returned. Gate thresholding must use
+    get_reasoning_score_details() so the two scales stay separate.
     """
 
-    scores: list[float] = []
+    details = get_reasoning_score_details(
+        retrieved_chunks
+    )
 
-    for chunk in retrieved_chunks:
-        raw_score = chunk.get(
-            "reranker_score",
-            chunk.get(
-                "retrieval_score",
-                chunk.get("score", 0.0),
-            ),
+    best_reranker_score = details[
+        "best_reranker_score"
+    ]
+
+    if best_reranker_score is not None:
+        return float(
+            best_reranker_score
         )
 
-        try:
-            scores.append(float(raw_score or 0.0))
-        except (TypeError, ValueError):
-            continue
+    best_retrieval_score = details[
+        "best_retrieval_score"
+    ]
 
-    return max(scores, default=0.0)
+    if best_retrieval_score is not None:
+        return float(
+            best_retrieval_score
+        )
+
+    return 0.0
+
+
+def get_chunk_focus_match_count(
+    focus_terms: set[str],
+    chunk_text: str,
+) -> int:
+    """
+    Count focus terms matched inside one chunk.
+
+    This supports the combined gate rule: a moderate score should
+    only be trusted when the same selected evidence also contains at
+    least one question-specific term.
+    """
+
+    chunk_tokens = set(
+        normalise_text(
+            chunk_text
+        ).split()
+    )
+
+    return sum(
+        1
+        for term in focus_terms
+        if get_token_variants(term).intersection(
+            chunk_tokens
+        )
+    )
+
+
+def build_reasoning_gate_chunk_details(
+    question: str,
+    retrieved_chunks: list[dict],
+) -> list[dict]:
+    """Build per-chunk score and focus-match diagnostics."""
+
+    focus_terms = extract_question_focus_terms(
+        question
+    )
+
+    details: list[dict] = []
+
+    for chunk in retrieved_chunks:
+        reranker_score = safe_optional_float(
+            chunk.get("reranker_score")
+        )
+
+        retrieval_score = safe_optional_float(
+            chunk.get(
+                "retrieval_score",
+                chunk.get("score"),
+            )
+        )
+
+        focus_match_count = (
+            get_chunk_focus_match_count(
+                focus_terms=focus_terms,
+                chunk_text=str(
+                    chunk.get("text") or ""
+                ),
+            )
+        )
+
+        details.append(
+            {
+                "chunk_id": str(
+                    chunk.get("chunk_id") or ""
+                ),
+                "reranker_score": reranker_score,
+                "retrieval_score": retrieval_score,
+                "focus_match_count": focus_match_count,
+            }
+        )
+
+    return details
+
+
+def print_reasoning_gate_decision(
+    diagnostics: dict,
+) -> None:
+    """Print one compact, machine-readable Day 2 gate trace."""
+
+    print(
+        "Reasoning gate decision:",
+        json.dumps(
+            diagnostics,
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+    )
 
 
 def should_skip_reasoning_llm(
     question: str,
     retrieved_chunks: list[dict],
-    minimum_confident_score: float = 6.0,
+    *,
+    minimum_reranker_score: float = (
+        REASONING_GATE_MIN_RERANKER_SCORE
+    ),
+    strong_reranker_score: float = (
+        REASONING_GATE_STRONG_RERANKER_SCORE
+    ),
+    minimum_retrieval_score: float = (
+        REASONING_GATE_MIN_RETRIEVAL_SCORE
+    ),
+    strong_retrieval_score: float = (
+        REASONING_GATE_STRONG_RETRIEVAL_SCORE
+    ),
+    minimum_focus_coverage: float = (
+        REASONING_GATE_MIN_FOCUS_COVERAGE
+    ),
+    debug: bool = REASONING_GATE_DEBUG,
 ) -> bool:
     """
-    Skip the reasoning LLM when specific question terms are absent
-    and retrieval/reranking confidence is also weak.
+    Decide whether to skip the reasoning LLM.
 
-    Yes/no questions are excluded because evidence may support a
-    negative answer without containing the proposed predicate.
-    Authorship questions use their own deterministic extractor.
+    Reasoning is allowed when at least one strong evidence signal
+    exists:
+
+    1. Enough question-specific terms occur in the selected evidence.
+    2. A reranker score is independently strong.
+    3. A retrieval score is independently strong.
+    4. A chunk has at least one focus-term match and a usable
+       reranker or retrieval score.
+
+    This keeps the gate active for clearly unsupported questions
+    while allowing semantically relevant paraphrases to reach the
+    reasoning LLM.
     """
 
-    if (
-        is_yes_no_question(question)
-        or is_authorship_question(question)
-        or parse_cli_command_question(question) is not None
-    ):
-        return False
-
-    if evidence_contains_focus_terms(
-        question=question,
-        retrieved_chunks=retrieved_chunks,
-    ):
-        return False
-
-    return (
-        get_best_reasoning_score(
-            retrieved_chunks
-        )
-        < minimum_confident_score
+    cleaned_question = clean_question_prefix(
+        question
     )
+
+    if not retrieved_chunks:
+        if debug:
+            print_reasoning_gate_decision(
+                {
+                    "question": cleaned_question,
+                    "reason": "no_retrieved_chunks",
+                    "skip_reasoning": True,
+                }
+            )
+
+        return True
+
+    special_case = (
+        is_yes_no_question(cleaned_question)
+        or is_authorship_question(cleaned_question)
+        or parse_cli_command_question(
+            cleaned_question
+        ) is not None
+    )
+
+    if special_case:
+        if debug:
+            print_reasoning_gate_decision(
+                {
+                    "question": cleaned_question,
+                    "reason": "special_question_type",
+                    "skip_reasoning": False,
+                }
+            )
+
+        return False
+
+    focus_details = get_focus_term_match_details(
+        question=cleaned_question,
+        retrieved_chunks=retrieved_chunks,
+    )
+
+    score_details = get_reasoning_score_details(
+        retrieved_chunks
+    )
+
+    chunk_details = (
+        build_reasoning_gate_chunk_details(
+            question=cleaned_question,
+            retrieved_chunks=retrieved_chunks,
+        )
+    )
+
+    focus_signal = (
+        focus_details["focus_term_count"] == 0
+        or (
+            focus_details["matched_count"] >= 1
+            and focus_details["coverage"]
+            >= minimum_focus_coverage
+        )
+    )
+
+    strong_reranker_signal = any(
+        item["reranker_score"] is not None
+        and item["reranker_score"]
+        >= strong_reranker_score
+        for item in chunk_details
+    )
+
+    strong_retrieval_signal = any(
+        item["retrieval_score"] is not None
+        and item["retrieval_score"]
+        >= strong_retrieval_score
+        for item in chunk_details
+    )
+
+    combined_chunk_signal = any(
+        item["focus_match_count"] >= 1
+        and (
+            (
+                item["reranker_score"] is not None
+                and item["reranker_score"]
+                >= minimum_reranker_score
+            )
+            or (
+                item["retrieval_score"] is not None
+                and item["retrieval_score"]
+                >= minimum_retrieval_score
+            )
+        )
+        for item in chunk_details
+    )
+
+    should_run_reasoning = (
+        focus_signal
+        or strong_reranker_signal
+        or strong_retrieval_signal
+        or combined_chunk_signal
+    )
+
+    skip_reasoning = not should_run_reasoning
+
+    if debug:
+        print_reasoning_gate_decision(
+            {
+                "question": cleaned_question,
+                "focus_terms": focus_details[
+                    "focus_terms"
+                ],
+                "matched_terms": focus_details[
+                    "matched_terms"
+                ],
+                "missing_terms": focus_details[
+                    "missing_terms"
+                ],
+                "focus_coverage": focus_details[
+                    "coverage"
+                ],
+                "best_reranker_score": score_details[
+                    "best_reranker_score"
+                ],
+                "best_retrieval_score": score_details[
+                    "best_retrieval_score"
+                ],
+                "focus_signal": focus_signal,
+                "strong_reranker_signal":
+                    strong_reranker_signal,
+                "strong_retrieval_signal":
+                    strong_retrieval_signal,
+                "combined_chunk_signal":
+                    combined_chunk_signal,
+                "skip_reasoning": skip_reasoning,
+                "chunk_signals": chunk_details,
+            }
+        )
+
+    return skip_reasoning
 
 # ============================================================
 # COA reasoning stage
