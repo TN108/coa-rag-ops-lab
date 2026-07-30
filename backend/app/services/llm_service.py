@@ -541,26 +541,92 @@ def is_ordered_subsequence(
 
     return True
 
+def canonicalise_evidence_token(
+    token: str,
+) -> str:
+    """
+    Apply small grammatical normalisation for evidence matching.
+
+    Examples:
+    nodes -> node
+    edges -> edge
+    determines -> determine
+    """
+    cleaned_token = str(
+        token or ""
+    ).strip().lower()
+
+    if not cleaned_token:
+        return ""
+
+    if (
+        len(cleaned_token) > 4
+        and cleaned_token.endswith("ies")
+    ):
+        return f"{cleaned_token[:-3]}y"
+
+    if (
+        len(cleaned_token) > 3
+        and cleaned_token.endswith("s")
+        and not cleaned_token.endswith(
+            (
+                "ss",
+                "us",
+                "is",
+            )
+        )
+    ):
+        return cleaned_token[:-1]
+
+    return cleaned_token
+
+
+def evidence_match_token_list(
+    text: str,
+) -> list[str]:
+    """
+    Return canonical meaningful tokens for evidence matching.
+    """
+    canonical_tokens: list[str] = []
+
+    for token in content_token_list(text):
+        canonical_token = (
+            canonicalise_evidence_token(token)
+        )
+
+        if canonical_token:
+            canonical_tokens.append(
+                canonical_token
+            )
+
+    return canonical_tokens
+
 
 def claim_token_coverage(
     claim: str,
     evidence_text: str,
 ) -> float:
     """
-    Calculate conservative token coverage using token counts.
-
-    This allows small grammatical paraphrases while still rejecting
-    claims that add substantial unsupported information.
+    Calculate conservative canonical-token coverage.
     """
+    claim_tokens = evidence_match_token_list(
+        claim
+    )
 
-    claim_tokens = content_token_list(claim)
-    evidence_tokens = content_token_list(evidence_text)
+    evidence_tokens = evidence_match_token_list(
+        evidence_text
+    )
 
     if not claim_tokens:
         return 0.0
 
-    claim_counts = Counter(claim_tokens)
-    evidence_counts = Counter(evidence_tokens)
+    claim_counts = Counter(
+        claim_tokens
+    )
+
+    evidence_counts = Counter(
+        evidence_tokens
+    )
 
     matched_tokens = sum(
         min(
@@ -570,7 +636,49 @@ def claim_token_coverage(
         for token, count in claim_counts.items()
     )
 
-    return matched_tokens / len(claim_tokens)
+    return matched_tokens / len(
+        claim_tokens
+    )
+def claim_token_coverage(
+    claim: str,
+    evidence_text: str,
+) -> float:
+    """
+    Calculate conservative canonical-token coverage.
+
+    Small grammatical variations such as node/nodes and
+    determine/determines are treated as equivalent.
+    """
+    claim_tokens = evidence_match_token_list(
+        claim
+    )
+
+    evidence_tokens = evidence_match_token_list(
+        evidence_text
+    )
+
+    if not claim_tokens:
+        return 0.0
+
+    claim_counts = Counter(
+        claim_tokens
+    )
+
+    evidence_counts = Counter(
+        evidence_tokens
+    )
+
+    matched_tokens = sum(
+        min(
+            count,
+            evidence_counts.get(token, 0),
+        )
+        for token, count in claim_counts.items()
+    )
+
+    return matched_tokens / len(
+        claim_tokens
+    )
 
 
 def find_direct_evidence_matches(
@@ -610,17 +718,20 @@ def find_direct_evidence_matches(
         if not chunk_id or not normalised_chunk_text:
             continue
 
+        evidence_tokens = content_token_list(
+            raw_chunk_text
+        )
+
         exact_match = (
-            normalised_claim in normalised_chunk_text
+            normalised_claim
+            in normalised_chunk_text
         )
 
         ordered_match = (
             len(claim_tokens) >= 4
             and is_ordered_subsequence(
                 claim_tokens=claim_tokens,
-                evidence_tokens=content_token_list(
-                    raw_chunk_text
-                ),
+                evidence_tokens=evidence_tokens,
             )
         )
 
@@ -634,12 +745,37 @@ def find_direct_evidence_matches(
             and coverage >= 0.90
         )
 
-        if (
+        is_selected = (
             exact_match
             or ordered_match
             or high_coverage_match
-        ):
-            matched_ids.append(chunk_id)
+        )
+
+        # Temporary Day 3 debugging.
+        # Show accepted matches and near matches with
+        # at least 60% token coverage.
+        if is_selected or coverage >= 0.60:
+            print(
+                "Direct evidence check:",
+                {
+                    "claim": claim,
+                    "chunk_id": chunk_id,
+                    "exact_match": exact_match,
+                    "ordered_match": ordered_match,
+                    "coverage": round(
+                        coverage,
+                        3,
+                    ),
+                    "high_coverage_match":
+                        high_coverage_match,
+                    "selected": is_selected,
+                },
+            )
+
+        if is_selected:
+            matched_ids.append(
+                chunk_id
+            )
 
     return list(
         dict.fromkeys(matched_ids)
@@ -2327,11 +2463,10 @@ def remove_invalid_evidence_ids(
     evidence IDs. Claims with a direct match are preferred when the
     question type limits the number of returned claims.
     """
-
     valid_chunk_ids = {
-        str(chunk.get("chunk_id"))
+        str(chunk.get("chunk_id")).strip()
         for chunk in retrieved_chunks
-        if chunk.get("chunk_id")
+        if str(chunk.get("chunk_id") or "").strip()
     }
 
     candidate_claims: list[
@@ -2354,29 +2489,84 @@ def remove_invalid_evidence_ids(
             cleaned_claim
         )
 
+        if not normalised_claim:
+            continue
+
         if normalised_claim in seen_claims:
             continue
 
-        valid_evidence_ids = list(
+        model_selected_ids = list(
             dict.fromkeys(
-                chunk_id
-                for chunk_id in item.evidence_chunk_ids
-                if chunk_id in valid_chunk_ids
+                str(chunk_id).strip()
+                for chunk_id in (
+                    item.evidence_chunk_ids or []
+                )
+                if str(chunk_id).strip()
             )
         )
 
-        direct_evidence_ids = find_direct_evidence_matches(
-            claim=cleaned_claim,
-            evidence_chunks=retrieved_chunks,
+        valid_selected_ids = [
+            chunk_id
+            for chunk_id in model_selected_ids
+            if chunk_id in valid_chunk_ids
+        ]
+
+        direct_evidence_ids = (
+            find_direct_evidence_matches(
+                claim=cleaned_claim,
+                evidence_chunks=retrieved_chunks,
+            )
         )
 
         if direct_evidence_ids:
-            valid_evidence_ids = direct_evidence_ids
+            final_evidence_ids = (
+                direct_evidence_ids
+            )
             support_priority = 2
-        elif valid_evidence_ids:
+            support_source = (
+                "deterministic_direct_match"
+            )
+
+        elif valid_selected_ids:
+            final_evidence_ids = (
+                valid_selected_ids
+            )
             support_priority = 1
+            support_source = (
+                "model_selected_valid_id"
+            )
+
         else:
+            print(
+                "Evidence ID repair rejected claim:",
+                {
+                    "claim": cleaned_claim,
+                    "model_selected_ids":
+                        model_selected_ids,
+                    "valid_selected_ids":
+                        valid_selected_ids,
+                    "reason":
+                        "No valid supporting evidence IDs",
+                },
+            )
             continue
+
+        print(
+            "Evidence ID repair:",
+            {
+                "claim": cleaned_claim,
+                "model_selected_ids":
+                    model_selected_ids,
+                "valid_selected_ids":
+                    valid_selected_ids,
+                "direct_match_ids":
+                    direct_evidence_ids,
+                "final_evidence_ids":
+                    final_evidence_ids,
+                "support_source":
+                    support_source,
+            },
+        )
 
         seen_claims.add(
             normalised_claim
@@ -2388,21 +2578,23 @@ def remove_invalid_evidence_ids(
                 original_index,
                 EvidenceClaim(
                     claim=cleaned_claim,
-                    evidence_chunk_ids=valid_evidence_ids,
+                    evidence_chunk_ids=(
+                        final_evidence_ids
+                    ),
                 ),
             )
         )
 
     candidate_claims.sort(
-        key=lambda item: (
-            -item[0],
-            item[1],
+        key=lambda candidate: (
+            -candidate[0],
+            candidate[1],
         )
     )
 
     cleaned_claims = [
-        item[2]
-        for item in candidate_claims
+        candidate[2]
+        for candidate in candidate_claims
     ]
 
     if max_claims is not None:

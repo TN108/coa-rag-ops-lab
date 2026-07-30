@@ -1,0 +1,1469 @@
+{
+  "message": "COA evaluation completed.",
+  "dataset_path": "C:\\Users\\Talha Nasir\\Desktop\\coa-rag-ops-lab\\data\\evaluation\\evaluation_dataset.json",
+  "configuration": {
+    "top_k": 5,
+    "min_retrieval_score": 0.1
+  },
+  "dataset_size": 20,
+  "answerable_questions": 15,
+  "unanswerable_questions": 5,
+  "total_evaluation_latency_ms": 1650059.78,
+  "average_evaluation_latency_ms": 82502.99,
+  "summary": {
+    "successful_questions": 20,
+    "failed_questions": 0,
+    "retrieval_hit_rate": 0.9333,
+    "mrr": 0.4655,
+    "answerable_response_rate": 0.4,
+    "unanswerable_accuracy": 1.0,
+    "answerable_exact_match_rate": 0.0,
+    "mean_answerable_token_f1": 0.2201,
+    "total_claims": 27,
+    "approved_claims": 13,
+    "rejected_claims": 14,
+    "claim_approval_rate": 0.4815,
+    "direct_match_decisions": 13,
+    "llm_critic_decisions": 14,
+    "empty_reasoning_count": 4,
+    "fallback_count": 14,
+    "rejected_claim_leakage_count": 0,
+    "rejected_claim_leakage_rate": 0.0,
+    "average_retrieval_latency_ms": 309.3525,
+    "average_reasoning_latency_ms": 59369.432,
+    "average_critic_latency_ms": 22811.001,
+    "average_synthesis_latency_ms": 0.0,
+    "average_total_latency_ms": 82501.613,
+    "p50_total_latency_ms": 78294.9,
+    "p95_total_latency_ms": 149793.64
+  },
+  "results": [
+    {
+      "question_id": "q001",
+      "question": "What is LangGraph?",
+      "category": "definition",
+      "difficulty": "easy",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents. It models AI workflows as graphs rather than simple chains.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        2,
+        3
+      ],
+      "final_answer": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        3,
+        1,
+        21,
+        2,
+        24
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph is an open source library authored by LangChain.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph models AI workflows as a graph instead of a chain.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 1,
+          "claim": "LangGraph is an open source library authored by LangChain.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 2,
+          "claim": "LangGraph models AI workflows as a graph instead of a chain.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.\nClaim 2 approved: The claim is directly stated in the cited evidence.\nClaim 3 approved: The claim is directly stated in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 1.0,
+      "exact_match": false,
+      "token_f1": 0.7826,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 3,
+      "approved_claims": 3,
+      "rejected_claims": 0,
+      "direct_match_decisions": 3,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 395.44,
+      "reasoning_latency_ms": 78791.95,
+      "critic_latency_ms": 12.21,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 79222.65,
+      "error": null
+    },
+    {
+      "question_id": "q002",
+      "question": "What are the main components of a LangGraph graph?",
+      "category": "components",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "The main components are state, nodes, and edges. State holds workflow data, nodes perform processing steps, and edges determine execution flow.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        6,
+        8
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        2,
+        40,
+        29,
+        6
+      ],
+      "structured_facts": [],
+      "critic_results": [],
+      "critic_feedback": "No structured facts were available for verification.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.2,
+      "exact_match": false,
+      "token_f1": 0.0588,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 0,
+      "approved_claims": 0,
+      "rejected_claims": 0,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": true,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 413.33,
+      "reasoning_latency_ms": 78291.88,
+      "critic_latency_ms": 0.0,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 78720.57,
+      "error": null
+    },
+    {
+      "question_id": "q003",
+      "question": "How does LangGraph manage application state?",
+      "category": "state_management",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "LangGraph uses a central graph state that is received, modified, and produced during execution. The state can be checkpointed so execution can be stored, paused, resumed, and recovered.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        5,
+        6,
+        29,
+        30
+      ],
+      "final_answer": "LangGraph manages application state by using nodes, which are Python/JS functions that receive the current state as input and can return an update to that state.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        3,
+        6,
+        2,
+        15,
+        33
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph manages application state by using nodes, which are Python/JS functions that receive the current state as input and can return an update to that state.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph uses edges to determine the path taken from one node to another, which can be either fixed or conditional.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph manages application state by using nodes, which are Python/JS functions that receive the current state as input and can return an update to that state.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 1,
+          "claim": "LangGraph uses edges to determine the path taken from one node to another, which can be either fixed or conditional.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that LangGraph uses edges to determine the path taken from one node to another, which can be either fixed or conditional, is not supported by the evidence.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.\nClaim 2 rejected: The claim that LangGraph uses edges to determine the path taken from one node to another, which can be either fixed or conditional, is not supported by the evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.5,
+      "exact_match": false,
+      "token_f1": 0.2545,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 2,
+      "approved_claims": 1,
+      "rejected_claims": 1,
+      "direct_match_decisions": 1,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 331.78,
+      "reasoning_latency_ms": 61420.89,
+      "critic_latency_ms": 32303.21,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 94068.41,
+      "error": null
+    },
+    {
+      "question_id": "q004",
+      "question": "What is a node in LangGraph?",
+      "category": "definition",
+      "difficulty": "easy",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "A node is a processing step, usually a Python or JavaScript function, that receives the current state and can return an update to that state.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        6
+      ],
+      "final_answer": "A node in LangGraph is a function or component that takes state, performs work, and returns updated state.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        6,
+        20,
+        3,
+        40
+      ],
+      "structured_facts": [
+        {
+          "claim": "A node in LangGraph is a function or component that takes state, performs work, and returns updated state.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_24_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "A node in LangGraph is a function or component that takes state, performs work, and returns updated state.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_24_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.5,
+      "exact_match": false,
+      "token_f1": 0.4651,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 1,
+      "approved_claims": 1,
+      "rejected_claims": 0,
+      "direct_match_decisions": 1,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 297.31,
+      "reasoning_latency_ms": 61323.33,
+      "critic_latency_ms": 1.26,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 61632.69,
+      "error": null
+    },
+    {
+      "question_id": "q005",
+      "question": "What is an edge in LangGraph?",
+      "category": "definition",
+      "difficulty": "easy",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "An edge is a connection between nodes that determines the execution path. Edges may be fixed or conditional.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        6,
+        8
+      ],
+      "final_answer": "An edge in langgraph is a connection between nodes that determines the path taken from the first node to the last, and can be either fixed or conditional.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        20,
+        24,
+        6,
+        40,
+        1
+      ],
+      "structured_facts": [
+        {
+          "claim": "an edge in langgraph is a connection between nodes that determines the path taken from the first node to the last, and can be either fixed or conditional.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "an edge in langgraph is a connection between nodes that determines the path taken from the first node to the last.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "an edge in langgraph is a connection between nodes that determines the path taken from the first node to the last, and can be either fixed or conditional.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 1,
+          "claim": "an edge in langgraph is a connection between nodes that determines the path taken from the first node to the last.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.\nClaim 2 approved: The claim is directly stated in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.3333,
+      "exact_match": false,
+      "token_f1": 0.6522,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 2,
+      "approved_claims": 2,
+      "rejected_claims": 0,
+      "direct_match_decisions": 2,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 275.58,
+      "reasoning_latency_ms": 75109.5,
+      "critic_latency_ms": 5.31,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 75402.89,
+      "error": null
+    },
+    {
+      "question_id": "q006",
+      "question": "What is conditional routing in LangGraph?",
+      "category": "routing",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "Conditional routing uses a function to examine the current state and decide which node should execute next.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        6,
+        8,
+        10
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        17,
+        20,
+        6,
+        24,
+        18
+      ],
+      "structured_facts": [
+        {
+          "claim": "Conditional routing in LangGraph is a function that evaluates the last message in the state and routes to the tools execution node if it contains tool calls.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_17_semantic_chunk_1",
+            "10. Langgraph (1).pdf_page_20_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "Conditional routing in LangGraph is a function that evaluates the last message in the state and routes to the tools execution node if it contains tool calls.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'Conditional routing in LangGraph is a function that evaluates the last message in the state and routes to the tools execution node if it contains tool calls.' does not match the evidence as it adds the phrase 'is a function' which is not present in the cited evidence.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'Conditional routing in LangGraph is a function that evaluates the last message in the state and routes to the tools execution node if it contains tool calls.' does not match the evidence as it adds the phrase 'is a function' which is not present in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.3333,
+      "exact_match": false,
+      "token_f1": 0.1333,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 246.09,
+      "reasoning_latency_ms": 82975.53,
+      "critic_latency_ms": 28500.25,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 111734.79,
+      "error": null
+    },
+    {
+      "question_id": "q007",
+      "question": "How can LangGraph be used to build multi-agent workflows?",
+      "category": "agents",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "LangGraph can represent agents or specialist actors as nodes, use edges to coordinate handoffs, and use shared state or subgraphs to let multiple agents communicate and work within one workflow.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        4,
+        5,
+        24,
+        27
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        19,
+        33,
+        2,
+        4,
+        3
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph can be used to build multi-agent workflows by enabling developers to implement multiactor architectures.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_4_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents that can be used to build multi-agent workflows.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph models AI workflows as a graph instead of a chain, which enables the implementation of multiactor architectures.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph can be used to build multi-agent workflows by enabling developers to implement multiactor architectures.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'LangGraph can be used to build multi-agent workflows by enabling developers to implement multiactor architectures.' is not supported because the cited evidence does not explicitly state or clearly entail this claim.",
+          "verification_method": "llm"
+        },
+        {
+          "claim_index": 1,
+          "claim": "LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents that can be used to build multi-agent workflows.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents is not supported because the evidence does not explicitly state this definition.",
+          "verification_method": "llm"
+        },
+        {
+          "claim_index": 2,
+          "claim": "LangGraph models AI workflows as a graph instead of a chain, which enables the implementation of multiactor architectures.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that LangGraph models AI workflows as a graph instead of a chain is not supported by the evidence.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'LangGraph can be used to build multi-agent workflows by enabling developers to implement multiactor architectures.' is not supported because the cited evidence does not explicitly state or clearly entail this claim.\nClaim 2 rejected: The claim that LangGraph is a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents is not supported because the evidence does not explicitly state this definition.\nClaim 3 rejected: The claim that LangGraph models AI workflows as a graph instead of a chain is not supported by the evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.25,
+      "exact_match": false,
+      "token_f1": 0.0465,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 3,
+      "approved_claims": 0,
+      "rejected_claims": 3,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 3,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 285.93,
+      "reasoning_latency_ms": 54351.61,
+      "critic_latency_ms": 94132.57,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 148780.66,
+      "error": null
+    },
+    {
+      "question_id": "q008",
+      "question": "What is the role of shared state in a LangGraph workflow?",
+      "category": "state_management",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "Shared state carries workflow data between nodes, allows actors to coordinate, and enables checkpointing, pause and resume, error recovery, and human-in-the-loop controls.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        5,
+        6,
+        29
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        2,
+        19,
+        17,
+        6
+      ],
+      "structured_facts": [],
+      "critic_results": [],
+      "critic_feedback": "No structured facts were available for verification.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.2,
+      "exact_match": false,
+      "token_f1": 0.1053,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 0,
+      "approved_claims": 0,
+      "rejected_claims": 0,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": true,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 355.02,
+      "reasoning_latency_ms": 73287.29,
+      "critic_latency_ms": 0.0,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 73652.68,
+      "error": null
+    },
+    {
+      "question_id": "q009",
+      "question": "How does LangGraph differ from a simple sequential chain?",
+      "category": "comparison",
+      "difficulty": "hard",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "A sequential chain follows a fixed linear sequence, while LangGraph models workflows as graphs that can include branches, conditional routing, loops, multiple actors, shared state, and durable execution.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        2,
+        3,
+        5,
+        6,
+        20,
+        30
+      ],
+      "final_answer": "LangGraph models AI workflows as a graph instead of a chain. Each step to be taken in a graph is represented by a node, which receives the current state as input and can return an update to that state. Nodes are simply Python/JS functions (tools), which receive the current state as input and can return an update to that state.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        40,
+        3,
+        2,
+        6
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph models AI workflows as a graph instead of a chain.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "Each step to be taken in a graph is represented by a node, which receives the current state as input and can return an update to that state.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "Nodes are simply Python/JS functions (tools), which receive the current state as input and can return an update to that state.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph models AI workflows as a graph instead of a chain.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 1,
+          "claim": "Each step to be taken in a graph is represented by a node, which receives the current state as input and can return an update to that state.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 2,
+          "claim": "Nodes are simply Python/JS functions (tools), which receive the current state as input and can return an update to that state.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.\nClaim 2 approved: The claim is directly stated in the cited evidence.\nClaim 3 approved: The claim is directly stated in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.3333,
+      "exact_match": false,
+      "token_f1": 0.2472,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 3,
+      "approved_claims": 3,
+      "rejected_claims": 0,
+      "direct_match_decisions": 3,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 320.38,
+      "reasoning_latency_ms": 94923.97,
+      "critic_latency_ms": 6.01,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 95267.74,
+      "error": null
+    },
+    {
+      "question_id": "q010",
+      "question": "What is the purpose of a StateGraph?",
+      "category": "architecture",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "StateGraph is used to construct a graph around a defined state schema by adding nodes and edges, then compiling the graph into an executable workflow.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        8,
+        9
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        6,
+        26,
+        2,
+        29
+      ],
+      "structured_facts": [],
+      "critic_results": [],
+      "critic_feedback": "No structured facts were available for verification.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.1053,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 0,
+      "approved_claims": 0,
+      "rejected_claims": 0,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": true,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 579.17,
+      "reasoning_latency_ms": 78785.22,
+      "critic_latency_ms": 0.0,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 79376.4,
+      "error": null
+    },
+    {
+      "question_id": "q011",
+      "question": "How are nodes connected inside a LangGraph application?",
+      "category": "architecture",
+      "difficulty": "easy",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "Nodes are connected with edges. Fixed edges always route to the same next node, while conditional edges use routing logic to select the next node.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        6,
+        8,
+        9
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        6,
+        40,
+        20,
+        42
+      ],
+      "structured_facts": [
+        {
+          "claim": "Nodes are connected inside a LangGraph application through edges, which determine the path taken from one node to another.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "Edges in a LangGraph application can be either fixed or conditional, determining whether the next node to visit is based on a function evaluation.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "Nodes are connected inside a LangGraph application through edges, which determine the path taken from one node to another.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'Nodes are connected inside a LangGraph application through edges, which determine the path taken from one node to another.' is not supported because the evidence only mentions 'Edges determine the path taken from the first node to the last, and they can be either: fixed (that is, after Node B, always visit node D) or conditional (evaluate a function to decide the next node to visit after node C).' without explicitly stating that nodes are connected through edges.",
+          "verification_method": "llm"
+        },
+        {
+          "claim_index": 1,
+          "claim": "Edges in a LangGraph application can be either fixed or conditional, determining whether the next node to visit is based on a function evaluation.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that Edges in a LangGraph application can be either fixed or conditional is not supported by the evidence.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'Nodes are connected inside a LangGraph application through edges, which determine the path taken from one node to another.' is not supported because the evidence only mentions 'Edges determine the path taken from the first node to the last, and they can be either: fixed (that is, after Node B, always visit node D) or conditional (evaluate a function to decide the next node to visit after node C).' without explicitly stating that nodes are connected through edges.\nClaim 2 rejected: The claim that Edges in a LangGraph application can be either fixed or conditional is not supported by the evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.5,
+      "exact_match": false,
+      "token_f1": 0.1053,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 2,
+      "approved_claims": 0,
+      "rejected_claims": 2,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 2,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 289.74,
+      "reasoning_latency_ms": 75285.74,
+      "critic_latency_ms": 93454.61,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 169040.25,
+      "error": null
+    },
+    {
+      "question_id": "q012",
+      "question": "Can LangGraph workflows contain loops?",
+      "category": "control_flow",
+      "difficulty": "easy",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "Yes. A conditional edge can route execution back to an earlier node, such as sending tool output back to an assistant node until no further tool call is needed.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        17,
+        20
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        17,
+        24,
+        19,
+        2,
+        3
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph workflows can contain loops.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_17_semantic_chunk_1",
+            "10. Langgraph (1).pdf_page_24_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph workflows can contain loops.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'LangGraph workflows can contain loops' is not supported by the provided evidence.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'LangGraph workflows can contain loops' is not supported by the provided evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 1.0,
+      "exact_match": false,
+      "token_f1": 0.0476,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 446.97,
+      "reasoning_latency_ms": 50317.25,
+      "critic_latency_ms": 27084.67,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 77869.23,
+      "error": null
+    },
+    {
+      "question_id": "q013",
+      "question": "How can a LangGraph workflow decide which node to execute next?",
+      "category": "routing",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "It can use a conditional edge whose routing function examines the current state and returns the label of the next node.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        8,
+        10,
+        17
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        6,
+        17,
+        19,
+        2
+      ],
+      "structured_facts": [
+        {
+          "claim": "A LangGraph workflow decides which node to execute next by using the tools_condition function, which checks if the last message contains tool_calls and returns 'tools' when it does.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_6_semantic_chunk_1",
+            "10. Langgraph (1).pdf_page_17_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "A LangGraph workflow decides which node to execute next by using the tools_condition function, which checks if the last message contains tool_calls and returns 'tools' when it does.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'A LangGraph workflow decides which node to execute next by using the tools_condition function, which checks if the last message contains tool_calls and returns 'tools' when it does.' is not supported because the evidence only mentions that tools_condition returns 'tools' when there are tool calls, but does not specify how it determines whether the last message contains tool_calls.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'A LangGraph workflow decides which node to execute next by using the tools_condition function, which checks if the last message contains tool_calls and returns 'tools' when it does.' is not supported because the evidence only mentions that tools_condition returns 'tools' when there are tool calls, but does not specify how it determines whether the last message contains tool_calls.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.3333,
+      "exact_match": false,
+      "token_f1": 0.0588,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 199.48,
+      "reasoning_latency_ms": 37694.35,
+      "critic_latency_ms": 43658.72,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 81561.32,
+      "error": null
+    },
+    {
+      "question_id": "q014",
+      "question": "What happens when a LangGraph workflow reaches the END node?",
+      "category": "control_flow",
+      "difficulty": "medium",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "The workflow terminates and returns its final state or result.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        8,
+        9,
+        17,
+        20
+      ],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        24,
+        17,
+        19,
+        33,
+        20
+      ],
+      "structured_facts": [
+        {
+          "claim": "When a LangGraph workflow reaches the END node, it ends.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_17_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "When a LangGraph workflow reaches the END node, it ends.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'When a LangGraph workflow reaches the END node, it ends.' is not supported because the evidence only mentions that when there are no tool calls, the workflow should terminate, but it does not explicitly state that the workflow ends.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'When a LangGraph workflow reaches the END node, it ends.' is not supported because the evidence only mentions that when there are no tool calls, the workflow should terminate, but it does not explicitly state that the workflow ends.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.5,
+      "exact_match": false,
+      "token_f1": 0.087,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": false,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 393.81,
+      "reasoning_latency_ms": 69373.65,
+      "critic_latency_ms": 46631.89,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 116408.41,
+      "error": null
+    },
+    {
+      "question_id": "q015",
+      "question": "What advantages does LangGraph provide for agentic applications?",
+      "category": "benefits",
+      "difficulty": "hard",
+      "answerable": true,
+      "notes": "",
+      "expected_answer": "LangGraph provides explicit control over multi-step and multi-actor workflows, shared state, conditional routing, loops, checkpointing, pause and resume, failure recovery, human-in-the-loop controls, and durable execution.",
+      "expected_document": "10. Langgraph (1).pdf",
+      "expected_pages": [
+        2,
+        3,
+        5,
+        29,
+        30
+      ],
+      "final_answer": "LangGraph provides a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents. LangGraph is designed to provide prebuilt architectures for common LLM and tool-calling loops. LangGraph provides a framework-agnostic deployment runtime that can deploy agents built with LangGraph or other frameworks.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        3,
+        33,
+        21,
+        42,
+        40
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph provides a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph is designed to provide prebuilt architectures for common LLM and tool-calling loops.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ]
+        },
+        {
+          "claim": "LangGraph provides a framework-agnostic deployment runtime that can deploy agents built with LangGraph or other frameworks.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_33_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph provides a low-level orchestration framework and runtime for building, managing, and deploying long-running, stateful agents.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 1,
+          "claim": "LangGraph is designed to provide prebuilt architectures for common LLM and tool-calling loops.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_3_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        },
+        {
+          "claim_index": 2,
+          "claim": "LangGraph provides a framework-agnostic deployment runtime that can deploy agents built with LangGraph or other frameworks.",
+          "supported": true,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [
+            "10. Langgraph (1).pdf_page_33_semantic_chunk_1"
+          ],
+          "feedback": "The claim is directly stated in the cited evidence.",
+          "verification_method": "direct_match"
+        }
+      ],
+      "critic_feedback": "Claim 1 approved: The claim is directly stated in the cited evidence.\nClaim 2 approved: The claim is directly stated in the cited evidence.\nClaim 3 approved: The claim is directly stated in the cited evidence.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 1.0,
+      "exact_match": false,
+      "token_f1": 0.1519,
+      "fallback_returned": false,
+      "answerable_response_returned": true,
+      "unanswerable_correct": false,
+      "total_claims": 3,
+      "approved_claims": 3,
+      "rejected_claims": 0,
+      "direct_match_decisions": 3,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 344.71,
+      "reasoning_latency_ms": 73816.35,
+      "critic_latency_ms": 1.76,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 74175.95,
+      "error": null
+    },
+    {
+      "question_id": "q016",
+      "question": "What GPU model is mandatory for running LangGraph?",
+      "category": "unanswerable",
+      "difficulty": "medium",
+      "answerable": false,
+      "notes": "The system should not invent a GPU requirement.",
+      "expected_answer": "The document does not specify that any particular GPU model is mandatory for running LangGraph.",
+      "expected_document": null,
+      "expected_pages": [],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        3,
+        40,
+        42,
+        44,
+        2
+      ],
+      "structured_facts": [
+        {
+          "claim": "There is no mention of a mandatory GPU model for running LangGraph in the retrieved evidence.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "There is no mention of a mandatory GPU model for running LangGraph in the retrieved evidence.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that there is no mention of a mandatory GPU model for running LangGraph in the retrieved evidence is incorrect because the evidence does not explicitly state this, but it also does not mention any GPU model as mandatory.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim that there is no mention of a mandatory GPU model for running LangGraph in the retrieved evidence is incorrect because the evidence does not explicitly state this, but it also does not mention any GPU model as mandatory.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.2857,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": true,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 145.66,
+      "reasoning_latency_ms": 33577.5,
+      "critic_latency_ms": 22683.14,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 56413.07,
+      "error": null
+    },
+    {
+      "question_id": "q017",
+      "question": "Who founded LangGraph in 1995?",
+      "category": "unanswerable",
+      "difficulty": "easy",
+      "answerable": false,
+      "notes": "Contains a false premise.",
+      "expected_answer": "The document does not contain this information, and the question contains an unsupported premise.",
+      "expected_document": null,
+      "expected_pages": [],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        1,
+        3,
+        2,
+        21,
+        40
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph was not founded in 1995.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_2_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph was not founded in 1995.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim 'LangGraph was not founded in 1995' is not supported because the evidence does not mention the founding year of LangGraph.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim 'LangGraph was not founded in 1995' is not supported because the evidence does not mention the founding year of LangGraph.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.5926,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": true,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 335.26,
+      "reasoning_latency_ms": 27812.57,
+      "critic_latency_ms": 21743.72,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 49899.86,
+      "error": null
+    },
+    {
+      "question_id": "q018",
+      "question": "What is the monthly subscription price of LangGraph mentioned in the document?",
+      "category": "unanswerable",
+      "difficulty": "easy",
+      "answerable": false,
+      "notes": "",
+      "expected_answer": "The document does not contain monthly subscription pricing information for LangGraph.",
+      "expected_document": null,
+      "expected_pages": [],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        1,
+        21,
+        45,
+        3,
+        24
+      ],
+      "structured_facts": [],
+      "critic_results": [],
+      "critic_feedback": "No structured facts were available for verification.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.5,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": true,
+      "total_claims": 0,
+      "approved_claims": 0,
+      "rejected_claims": 0,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 0,
+      "empty_reasoning": true,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 194.76,
+      "reasoning_latency_ms": 2.82,
+      "critic_latency_ms": 0.0,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 205.34,
+      "error": null
+    },
+    {
+      "question_id": "q019",
+      "question": "Which programming language is completely unsupported by LangGraph?",
+      "category": "unanswerable",
+      "difficulty": "medium",
+      "answerable": false,
+      "notes": "",
+      "expected_answer": "The document does not provide enough information to identify any programming language as completely unsupported.",
+      "expected_document": null,
+      "expected_pages": [],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        3,
+        1,
+        18,
+        21,
+        24
+      ],
+      "structured_facts": [
+        {
+          "claim": "LangGraph does not support the use of Python.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_24_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "LangGraph does not support the use of Python.",
+          "supported": false,
+          "relevant_to_question": true,
+          "verified_chunk_ids": [],
+          "feedback": "The claim that LangGraph does not support the use of Python is not supported because the evidence does not explicitly state or clearly entail this claim.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The claim that LangGraph does not support the use of Python is not supported because the evidence does not explicitly state or clearly entail this claim.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.5,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": true,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 155.24,
+      "reasoning_latency_ms": 31975.19,
+      "critic_latency_ms": 23061.75,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 55199.69,
+      "error": null
+    },
+    {
+      "question_id": "q020",
+      "question": "What database must be installed before LangGraph can run?",
+      "category": "unanswerable",
+      "difficulty": "medium",
+      "answerable": false,
+      "notes": "",
+      "expected_answer": "The document does not state that a specific database must be installed before LangGraph can run.",
+      "expected_document": null,
+      "expected_pages": [],
+      "final_answer": "The provided document context does not contain enough information to answer this question.",
+      "retrieved_documents": [
+        "10. Langgraph (1).pdf"
+      ],
+      "retrieved_pages": [
+        42,
+        40,
+        3,
+        6,
+        33
+      ],
+      "structured_facts": [
+        {
+          "claim": "dependencies must be installed before LangGraph can run.",
+          "evidence_chunk_ids": [
+            "10. Langgraph (1).pdf_page_42_semantic_chunk_1"
+          ]
+        }
+      ],
+      "critic_results": [
+        {
+          "claim_index": 0,
+          "claim": "dependencies must be installed before LangGraph can run.",
+          "supported": false,
+          "relevant_to_question": false,
+          "verified_chunk_ids": [],
+          "feedback": "The cited evidence was not accepted as direct support for this claim.",
+          "verification_method": "llm"
+        }
+      ],
+      "critic_feedback": "Claim 1 rejected: The cited evidence was not accepted as direct support for this claim.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "exact_match": false,
+      "token_f1": 0.2759,
+      "fallback_returned": true,
+      "answerable_response_returned": false,
+      "unanswerable_correct": true,
+      "total_claims": 1,
+      "approved_claims": 0,
+      "rejected_claims": 1,
+      "direct_match_decisions": 0,
+      "llm_critic_decisions": 1,
+      "empty_reasoning": false,
+      "rejected_claim_leaked": false,
+      "retrieval_latency_ms": 181.39,
+      "reasoning_latency_ms": 48272.05,
+      "critic_latency_ms": 22938.94,
+      "synthesis_latency_ms": 0.0,
+      "total_latency_ms": 71399.66,
+      "error": null
+    }
+  ]
+}
