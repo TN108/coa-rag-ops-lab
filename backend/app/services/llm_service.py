@@ -545,25 +545,123 @@ def canonicalise_evidence_token(
     token: str,
 ) -> str:
     """
-    Apply small grammatical normalisation for evidence matching.
+    Apply conservative grammatical normalisation for evidence matching.
 
     Examples:
     nodes -> node
-    edges -> edge
+    connections -> connect
+    connected -> connect
     determines -> determine
+    determining -> determine
+    evaluation -> evaluate
     """
+
     cleaned_token = str(
         token or ""
-    ).strip().lower()
+    ).strip().casefold()
 
     if not cleaned_token:
         return ""
+
+    explicit_variants = {
+        "connection": "connect",
+        "connections": "connect",
+        "connected": "connect",
+        "connecting": "connect",
+        "connects": "connect",
+
+        "determines": "determine",
+        "determined": "determine",
+        "determining": "determine",
+
+        "evaluation": "evaluate",
+        "evaluations": "evaluate",
+        "evaluated": "evaluate",
+        "evaluating": "evaluate",
+        "evaluates": "evaluate",
+
+        "decides": "decide",
+        "decided": "decide",
+        "deciding": "decide",
+
+        "routes": "route",
+        "routed": "route",
+        "routing": "route",
+
+        # Protect common irregular forms from the generic suffix
+        # rules below. Without these mappings, "using" becomes
+        # "us" and "does" becomes "doe".
+        "use": "use",
+        "uses": "use",
+        "used": "use",
+        "using": "use",
+
+        "do": "do",
+        "does": "do",
+        "did": "do",
+        "doing": "do",
+
+        "checks": "check",
+        "checked": "check",
+        "checking": "check",
+
+        "contains": "contain",
+        "contained": "contain",
+        "containing": "contain",
+
+        "returns": "return",
+        "returned": "return",
+        "returning": "return",
+
+        "executes": "execute",
+        "executed": "execute",
+        "executing": "execute",
+    }
+
+    if cleaned_token in explicit_variants:
+        return explicit_variants[
+            cleaned_token
+        ]
 
     if (
         len(cleaned_token) > 4
         and cleaned_token.endswith("ies")
     ):
         return f"{cleaned_token[:-3]}y"
+
+    if (
+        len(cleaned_token) > 4
+        and cleaned_token.endswith("ing")
+    ):
+        stem = cleaned_token[:-3]
+
+        if stem.endswith(
+            (
+                "at",
+                "it",
+                "iz",
+            )
+        ):
+            return f"{stem}e"
+
+        return stem
+
+    if (
+        len(cleaned_token) > 3
+        and cleaned_token.endswith("ed")
+    ):
+        stem = cleaned_token[:-2]
+
+        if stem.endswith(
+            (
+                "at",
+                "it",
+                "iz",
+            )
+        ):
+            return f"{stem}e"
+
+        return stem
 
     if (
         len(cleaned_token) > 3
@@ -580,13 +678,35 @@ def canonicalise_evidence_token(
 
     return cleaned_token
 
-
 def evidence_match_token_list(
     text: str,
 ) -> list[str]:
     """
     Return canonical meaningful tokens for evidence matching.
+
+    Structural connector words are ignored because they often
+    change during a faithful paraphrase without changing meaning.
     """
+
+    ignored_match_tokens = {
+        "inside",
+        "through",
+        "which",
+        "whether",
+        "based",
+        "on",
+        "one",
+        "another",
+
+        # Grammatical bridge words may appear in a faithful
+        # paraphrase without being repeated in the evidence.
+        "by",
+        "use",
+        "when",
+        "if",
+        "do",
+    }
+
     canonical_tokens: list[str] = []
 
     for token in content_token_list(text):
@@ -594,7 +714,11 @@ def evidence_match_token_list(
             canonicalise_evidence_token(token)
         )
 
-        if canonical_token:
+        if (
+            canonical_token
+            and canonical_token
+            not in ignored_match_tokens
+        ):
             canonical_tokens.append(
                 canonical_token
             )
@@ -602,43 +726,6 @@ def evidence_match_token_list(
     return canonical_tokens
 
 
-def claim_token_coverage(
-    claim: str,
-    evidence_text: str,
-) -> float:
-    """
-    Calculate conservative canonical-token coverage.
-    """
-    claim_tokens = evidence_match_token_list(
-        claim
-    )
-
-    evidence_tokens = evidence_match_token_list(
-        evidence_text
-    )
-
-    if not claim_tokens:
-        return 0.0
-
-    claim_counts = Counter(
-        claim_tokens
-    )
-
-    evidence_counts = Counter(
-        evidence_tokens
-    )
-
-    matched_tokens = sum(
-        min(
-            count,
-            evidence_counts.get(token, 0),
-        )
-        for token, count in claim_counts.items()
-    )
-
-    return matched_tokens / len(
-        claim_tokens
-    )
 def claim_token_coverage(
     claim: str,
     evidence_text: str,
@@ -679,7 +766,50 @@ def claim_token_coverage(
     return matched_tokens / len(
         claim_tokens
     )
+def shared_canonical_bigram_count(
+    claim: str,
+    evidence_text: str,
+) -> int:
+    """
+    Count adjacent canonical token pairs shared by the claim
+    and evidence.
 
+    Multiple shared pairs provide stronger evidence of a close
+    paraphrase than token coverage alone.
+    """
+
+    claim_tokens = evidence_match_token_list(
+        claim
+    )
+
+    evidence_tokens = evidence_match_token_list(
+        evidence_text
+    )
+
+    if (
+        len(claim_tokens) < 2
+        or len(evidence_tokens) < 2
+    ):
+        return 0
+
+    claim_bigrams = set(
+        zip(
+            claim_tokens,
+            claim_tokens[1:],
+        )
+    )
+
+    evidence_bigrams = set(
+        zip(
+            evidence_tokens,
+            evidence_tokens[1:],
+        )
+    )
+
+    return len(
+        claim_bigrams
+        & evidence_bigrams
+    )
 
 def find_direct_evidence_matches(
     claim: str,
@@ -692,6 +822,7 @@ def find_direct_evidence_matches(
     1. Exact normalised substring.
     2. Ordered meaningful-token match.
     3. Conservative high token coverage.
+    4. Guarded paraphrase match using coverage and shared bigrams.
     """
 
     normalised_claim = normalise_text(claim)
@@ -740,15 +871,29 @@ def find_direct_evidence_matches(
             evidence_text=raw_chunk_text,
         )
 
+        shared_bigram_count = (
+            shared_canonical_bigram_count(
+                claim=claim,
+                evidence_text=raw_chunk_text,
+            )
+        )
+
         high_coverage_match = (
             len(claim_tokens) >= 6
             and coverage >= 0.90
+        )
+
+        guarded_paraphrase_match = (
+            len(claim_tokens) >= 8
+            and coverage >= 0.85
+            and shared_bigram_count >= 3
         )
 
         is_selected = (
             exact_match
             or ordered_match
             or high_coverage_match
+            or guarded_paraphrase_match
         )
 
         # Temporary Day 3 debugging.
@@ -768,6 +913,10 @@ def find_direct_evidence_matches(
                     ),
                     "high_coverage_match":
                         high_coverage_match,
+                    "shared_bigram_count":
+                        shared_bigram_count,
+                    "guarded_paraphrase_match":
+                        guarded_paraphrase_match,
                     "selected": is_selected,
                 },
             )
