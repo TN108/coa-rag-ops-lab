@@ -402,6 +402,249 @@ def is_authorship_question(
 
     return cleaned.startswith(patterns)
 
+# Existing helper functions above...
+
+
+def detect_question_type(
+    question: str,
+) -> str:
+    """
+    Classify a question by the kind of answer it requests.
+    """
+
+    normalized_question = " ".join(
+        str(question).strip().lower().split()
+    )
+
+    comparison_markers = (
+        "differ",
+        "different from",
+        "difference between",
+        "compare",
+        "compared with",
+        "compared to",
+        "versus",
+        " vs ",
+        "unlike",
+    )
+
+    benefit_markers = (
+        "advantage",
+        "advantages",
+        "benefit",
+        "benefits",
+        "why is",
+        "why are",
+        "why useful",
+        "what does it provide",
+    )
+
+    component_markers = (
+        "component",
+        "components",
+        "part",
+        "parts",
+        "element",
+        "elements",
+        "consist of",
+        "made up of",
+    )
+
+    role_markers = (
+        "role of",
+        "purpose of",
+        "function of",
+        "responsibility of",
+        "what does",
+        "what is the role",
+        "what is the purpose",
+    )
+
+    if any(
+        marker in normalized_question
+        for marker in comparison_markers
+    ):
+        return "comparison"
+
+    if any(
+        marker in normalized_question
+        for marker in benefit_markers
+    ):
+        return "benefit"
+
+    if any(
+        marker in normalized_question
+        for marker in component_markers
+    ):
+        return "components"
+
+    if any(
+        marker in normalized_question
+        for marker in role_markers
+    ):
+        return "role"
+
+    return "general"
+
+def comparison_claim_is_relevant(
+    question: str,
+    claim: str,
+) -> bool:
+    """
+    Check whether a claim expresses a comparison requested
+    by the question.
+
+    This checks relevance only. It does not verify whether
+    the evidence supports the claim.
+    """
+
+    normalized_question = normalise_text(question)
+    normalized_claim = normalise_text(claim)
+
+    if not normalized_question or not normalized_claim:
+        return False
+
+    comparison_patterns = (
+        "instead of",
+        "unlike",
+        "whereas",
+        "compared with",
+        "compared to",
+        "rather than",
+        "in contrast",
+        "on the other hand",
+    )
+
+    expresses_comparison = any(
+        pattern in normalized_claim
+        for pattern in comparison_patterns
+    )
+
+    # “While” often expresses a comparison:
+    # “X uses a graph, while Y uses a chain.”
+    if " while " in f" {normalized_claim} ":
+        expresses_comparison = True
+
+    if not expresses_comparison:
+        return False
+
+    ignored_tokens = {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "does",
+        "from",
+        "how",
+        "is",
+        "it",
+        "of",
+        "the",
+        "to",
+        "what",
+        "with",
+    }
+
+    question_tokens = {
+        token
+        for token in normalized_question.split()
+        if token not in ignored_tokens
+        and len(token) > 2
+    }
+
+    claim_tokens = set(
+        normalized_claim.split()
+    )
+
+    shared_focus_tokens = (
+        question_tokens & claim_tokens
+    )
+
+    return bool(shared_focus_tokens)
+
+def benefit_claim_is_relevant(
+    question: str,
+    claim: str,
+) -> bool:
+    """
+    Check whether a claim describes a benefit, advantage,
+    capability, or useful outcome requested by the question.
+    """
+
+    normalized_question = normalise_text(
+        question
+    )
+
+    normalized_claim = normalise_text(
+        claim
+    )
+
+    if not normalized_question or not normalized_claim:
+        return False
+
+    benefit_patterns = (
+        "allows",
+        "enables",
+        "helps",
+        "provides",
+        "supports",
+        "improves",
+        "reduces",
+        "simplifies",
+        "makes it possible",
+        "useful for",
+        "beneficial",
+        "advantage",
+        "benefit",
+    )
+
+    expresses_benefit = any(
+        pattern in normalized_claim
+        for pattern in benefit_patterns
+    )
+
+    if not expresses_benefit:
+        return False
+
+    ignored_tokens = {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "does",
+        "for",
+        "how",
+        "is",
+        "it",
+        "of",
+        "the",
+        "to",
+        "what",
+        "why",
+    }
+
+    question_tokens = {
+        token
+        for token in normalized_question.split()
+        if (
+            token not in ignored_tokens
+            and len(token) > 2
+        )
+    }
+
+    claim_tokens = set(
+        normalized_claim.split()
+    )
+
+    shared_focus_tokens = (
+        question_tokens & claim_tokens
+    )
+
+    return bool(
+        shared_focus_tokens
+    )
 
 def is_claim_relevant(
     question: str,
@@ -935,24 +1178,53 @@ def filter_question_relevant_claims(
     question: str,
     reasoning_output: ReasoningOutput,
 ) -> ReasoningOutput:
-    """Filter structurally irrelevant definition claims."""
+    """
+    Remove claims that do not directly answer the question.
 
-    if not is_definition_question(question):
-        return reasoning_output
+    Validation depends on the detected question type.
+    """
 
-    relevant_claims = [
-        item
-        for item in reasoning_output.claims
-        if is_claim_relevant(
-            question=question,
-            claim=item.claim,
-        )
-    ]
+    question_type = detect_question_type(
+        question
+    )
+
+    relevant_claims: list[EvidenceClaim] = []
+
+    for item in reasoning_output.claims:
+        claim = item.claim
+
+        if question_type == "comparison":
+            relevant = comparison_claim_is_relevant(
+                question=question,
+                claim=claim,
+            )
+
+       
+        elif question_type == "benefit":
+            relevant = benefit_claim_is_relevant(
+                question=cleaned_question,
+                claim=claim,
+            )
+        elif is_definition_question(
+            cleaned_question
+        ):
+            relevant = is_claim_relevant(
+                question=cleaned_question,
+                claim=claim,)
+
+        else:
+            # Temporary fallback until benefit, component,
+            # and role validators are added.
+            relevant = True
+
+        if relevant:
+            relevant_claims.append(
+                item
+            )
 
     return ReasoningOutput(
         claims=relevant_claims
     )
-
 
 # ============================================================
 # Chunk helpers
@@ -1412,14 +1684,14 @@ def extract_explicit_authorship_fact(
 CLI_COMMAND_RULES: dict[str, dict[str, object]] = {
     "langgraph dev": {
         "claim": (
-             "The langgraph dockerfile command emits a Dockerfile "
-        "derived from your config for custom builds."
+             "The langgraph dev command starts a lightweight local "
+            "development server for rapid testing."
         ),
         "preceding_phrases": (
             "starts a lightweight local dev server ideal for rapid testing",
         ),
         "following_phrases": (
-            "this in memory server is designed for development and testing",
+           "this in memory server is designed for development and testing",
         ),
     },
     "langgraph build": {
@@ -2379,7 +2651,6 @@ def should_skip_reasoning_llm(
 # ============================================================
 # COA reasoning stage
 # ============================================================
-
 def generate_coa_facts(
     question: str,
     retrieved_chunks: list[dict],
@@ -2396,6 +2667,10 @@ def generate_coa_facts(
             status_code=400,
             detail="Question cannot be empty.",
         )
+
+    question_type = detect_question_type(
+        cleaned_question
+    )
 
     yes_no_question = is_yes_no_question(
         cleaned_question
@@ -2487,6 +2762,68 @@ For every returned claim:
   command, dependency, company, example, or another entity.
 """.strip()
 
+    comparison_instruction = ""
+
+    if question_type == "comparison":
+        comparison_instruction = """
+This is a comparison question.
+
+Return only claims that directly describe a difference, contrast,
+or distinction requested by the question.
+
+A comparison claim should:
+- clearly connect the entities or concepts being compared;
+- normally mention both sides of the comparison;
+- use contrast wording when supported, such as "whereas",
+  "unlike", "instead of", "rather than", or "compared with";
+- explain how one side differs from the other.
+
+Do not return unrelated definitions, ownership information,
+background details, examples, or isolated facts that do not
+express a comparison.
+
+Do not invent the second side of a comparison when the evidence
+describes only one side.
+""".strip()
+
+    benefit_instruction = ""
+
+    if question_type == "benefit":
+        benefit_instruction = """
+This is a benefit or advantage question.
+
+Return claims that directly explain a useful outcome, capability,
+advantage, or reason for using the subject in the question.
+
+Do not return general definitions or component descriptions unless
+they directly explain the requested benefit.
+""".strip()
+
+    component_instruction = ""
+
+    if question_type == "components":
+        component_instruction = """
+This is a component question.
+
+Return claims that identify the parts, elements, modules, or
+components requested by the question.
+
+Do not return unrelated benefits, history, ownership details,
+or general definitions.
+""".strip()
+
+    role_instruction = ""
+
+    if question_type == "role":
+        role_instruction = """
+This is a role, purpose, or function question.
+
+Return claims that directly explain what the requested subject does,
+what responsibility it has, or why it exists in the described system.
+
+Do not return unrelated definitions, benefits, or background facts.
+""".strip()
+
     yes_no_instruction = ""
 
     if yes_no_question:
@@ -2534,7 +2871,18 @@ Retrieved evidence:
 Question:
 {cleaned_question}
 
+Detected question type:
+{question_type}
+
 {definition_instruction}
+
+{comparison_instruction}
+
+{benefit_instruction}
+
+{component_instruction}
+
+{role_instruction}
 
 {yes_no_instruction}
 
@@ -2570,6 +2918,9 @@ Rules:
 23. Ignore copyright notices, watermarks, slide creators, presenters, headers, footers, and document-owner names unless the question explicitly asks about the document.
 24. Do not treat a name following a copyright symbol as the author of a framework, library, product, or technology.
 25. For authorship questions, use only evidence that explicitly links the subject to an author, creator, developer, writer, or builder.
+26. For comparison questions, do not return an isolated fact unless it clearly expresses the requested contrast.
+27. Do not infer missing comparison details from outside knowledge.
+28. Match the requested question type instead of returning generally related information.
 """.strip()
 
     llm = get_llm()
@@ -2596,9 +2947,10 @@ Rules:
         question=cleaned_question,
         reasoning_output=cleaned_output,
     )
-# ============================================================
+
+
 # Evidence validation and repair
-# ============================================================
+
 
 def remove_invalid_evidence_ids(
     reasoning_output: ReasoningOutput,

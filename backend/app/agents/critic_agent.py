@@ -15,7 +15,20 @@ from app.services.llm_service import (
 )
 
 from app.agents.state import COAState
-
+from app.services.llm_service import (
+    SingleCriticDecision,
+    claim_token_coverage,
+    comparison_claim_is_relevant,
+    detect_question_type,
+    evidence_match_token_list,
+    extract_question_focus_terms,
+    find_direct_evidence_matches,
+    get_llm,
+    get_token_variants,
+    is_claim_relevant,
+    normalise_text,
+    shared_canonical_bigram_count,
+)
 
 def build_evidence_items(
     cited_chunk_ids: list[str],
@@ -457,10 +470,10 @@ def criticise_single_claim(
 
     Verification order:
     1. Validate the claim and cited evidence IDs.
-    2. Check for a deterministic direct evidence match.
-    3. Use the LLM for paraphrased or uncertain support.
-    4. Use LLM relevance only for questions requesting a
-       specific identity, value, category, or named item.
+    2. Determine question-aware relevance.
+    3. Check for deterministic evidence support.
+    4. Use the LLM for paraphrased or uncertain support.
+    5. Keep evidence support and question relevance separate.
     """
 
     cleaned_claim = " ".join(
@@ -475,10 +488,38 @@ def criticise_single_claim(
         )
     )
 
+    # Existing definition-aware relevance check.
     deterministic_relevance = is_claim_relevant(
         question=question,
         claim=cleaned_claim,
     )
+
+    # Existing general focus check.
+    question_focus_match = (
+        claim_matches_question_focus(
+            question=question,
+            claim=cleaned_claim,
+        )
+    )
+
+    # Day 5: identify the general type of question.
+    question_type = detect_question_type(
+        question
+    )
+
+    # Day 5: comparison questions require comparison meaning,
+    # not merely a related fact about the same subject.
+    if question_type == "comparison":
+        question_aware_relevance = (
+            comparison_claim_is_relevant(
+                question=question,
+                claim=cleaned_claim,
+            )
+        )
+    else:
+        question_aware_relevance = (
+            question_focus_match
+        )
 
     if not cleaned_claim:
         return {
@@ -493,7 +534,7 @@ def criticise_single_claim(
         return {
             "supported": False,
             "relevant_to_question": (
-                deterministic_relevance
+                question_aware_relevance
             ),
             "verified_chunk_ids": [],
             "feedback": (
@@ -512,7 +553,7 @@ def criticise_single_claim(
         return {
             "supported": False,
             "relevant_to_question": (
-                deterministic_relevance
+                question_aware_relevance
             ),
             "verified_chunk_ids": [],
             "feedback": (
@@ -523,13 +564,6 @@ def criticise_single_claim(
 
     specific_question = requires_specific_answer(
         question
-    )
-
-    question_focus_match = (
-        claim_matches_question_focus(
-            question=question,
-            claim=cleaned_claim,
-        )
     )
 
     unsupported_qualifiers = (
@@ -551,13 +585,15 @@ def criticise_single_claim(
         )
     )
 
+    # Definition questions retain the stricter Day 4 relevance rule.
+    # All other ordinary questions use question-type-aware relevance.
     if definition_question:
         direct_match_relevance = (
             deterministic_relevance
         )
     else:
         direct_match_relevance = (
-            question_focus_match
+            question_aware_relevance
         )
 
     direct_matches = find_direct_evidence_matches(
@@ -579,11 +615,11 @@ def criticise_single_claim(
     )
 
     # A deterministic evidence match establishes support.
-    # Relevance is evaluated separately.
+    # Relevance remains a separate decision.
     #
-    # Specific-answer questions still require an LLM relevance
-    # decision because a supported statement may fail to provide
-    # the requested database, person, price, date, or named item.
+    # Specific-answer questions still use the LLM for relevance
+    # because a supported statement may fail to supply the requested
+    # identity, value, date, number, system, or named item.
     if (
         deterministic_support_ids
         and not specific_question
@@ -594,6 +630,7 @@ def criticise_single_claim(
                 "directly stated in"
             )
             method_prefix = "direct_match"
+
         else:
             support_description = (
                 "jointly supported by"
@@ -610,6 +647,7 @@ def criticise_single_claim(
             verification_method = (
                 method_prefix
             )
+
         else:
             feedback = (
                 f"The claim is {support_description} the cited "
@@ -780,9 +818,9 @@ Rules:
         )
     )
 
-    # When a specific-answer question has a safe direct evidence
-    # match, preserve deterministic support and use the LLM only
-    # for the relevance decision.
+    # When a specific-answer question has deterministic evidence
+    # support, preserve that support and use the LLM only for its
+    # relevance decision.
     if (
         deterministic_support_ids
         and specific_question
@@ -810,8 +848,8 @@ Rules:
     # definition checking.
     #
     # Example:
-    # "What is the price?" starts with "What is", but asks for a
-    # specific value rather than a general definition.
+    # "What is the price?" begins with "What is", but requests a
+    # particular value rather than a definition.
     if specific_question:
         final_relevance = bool(
             decision.relevant_to_question
@@ -823,9 +861,11 @@ Rules:
         )
 
     else:
-        # For ordinary questions, require the claim to discuss the
-        # main subject of the question.
-        final_relevance = question_focus_match
+        # Day 5: comparison questions now use comparison-aware
+        # relevance in both deterministic and LLM support paths.
+        final_relevance = (
+            question_aware_relevance
+        )
 
     feedback = normalise_critic_feedback(
         supported=supported,
@@ -859,8 +899,8 @@ Rules:
     ):
         feedback = (
             "The claim is supported by the cited evidence, "
-            "but it does not provide the specific information "
-            "requested by the question."
+            "but it does not provide the information requested "
+            "by the question."
         )
 
     elif (
@@ -883,8 +923,6 @@ Rules:
         "feedback": feedback,
         "verification_method": "llm",
     }
-
-
 def critic_agent(
     state: COAState,
 ) -> COAState:
